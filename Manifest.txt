@@ -1,0 +1,7 @@
+History.txt
+Manifest.txt
+README.txt
+Rakefile
+bin/gorby
+lib/gorby.rb
+test/test_gorby.rb
