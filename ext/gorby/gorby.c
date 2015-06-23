@@ -83,6 +83,32 @@ static VALUE allocate_session(VALUE klass)
     return rb_session;
 }
 
+static VALUE session_want_write_p(VALUE self)
+{
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    if (nghttp2_session_want_write(session) == 0) {
+	return Qfalse;
+    }
+
+    return Qtrue;
+}
+
+static VALUE session_want_read_p(VALUE self)
+{
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    if (nghttp2_session_want_read(session) == 0) {
+	return Qfalse;
+    }
+
+    return Qtrue;
+}
+
 static VALUE session_submit_settings(VALUE self, VALUE settings)
 {
     size_t niv, i;
@@ -138,6 +164,8 @@ void Init_gorby(void)
 
     cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
     rb_define_alloc_func(cGorbySession, allocate_session);
+    rb_define_method(cGorbySession, "want_write?", session_want_write_p, 0);
+    rb_define_method(cGorbySession, "want_read?", session_want_read_p, 0);
     rb_define_method(cGorbySession, "submit_settings", session_submit_settings, 1);
     rb_define_method(cGorbySession, "send", session_send, 0);
 

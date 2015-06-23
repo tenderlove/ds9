@@ -27,4 +27,19 @@ class TestGorby < Minitest::Test
     session.send
     assert called
   end
+
+  def test_want_read?
+    session = Gorby::Session.new
+    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    assert_predicate session, :want_write?
+  end
+
+  def test_want_write?
+    session = Gorby::Session.new
+    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    assert_predicate session, :want_write?
+
+    session = Gorby::Session.new
+    refute_predicate session, :want_write?
+  end
 end
