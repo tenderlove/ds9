@@ -17,8 +17,12 @@ static ssize_t send_callback(nghttp2_session * session,
 			     size_t length,
 			     int flags, void *user_data)
 {
-    printf("send_callback\n");
-    return 0;
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("send_callback"), 1, rb_str_new(data, length));
+
+    return NUM2INT(ret);
 }
 
 static int on_frame_recv_callback(nghttp2_session *session,
@@ -109,6 +113,21 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     return self;
 }
 
+static VALUE session_send(VALUE self)
+{
+    int rv;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    rv = nghttp2_session_send(session);
+    if (rv != 0) {
+	rb_raise(rb_eRuntimeError, "Error: %s", nghttp2_strerror(rv));
+    }
+
+    return self;
+}
+
 void Init_gorby(void)
 {
     mGorby = rb_define_module("Gorby");
@@ -120,6 +139,7 @@ void Init_gorby(void)
     cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
     rb_define_alloc_func(cGorbySession, allocate_session);
     rb_define_method(cGorbySession, "submit_settings", session_submit_settings, 1);
+    rb_define_method(cGorbySession, "send", session_send, 0);
 
 }
 
