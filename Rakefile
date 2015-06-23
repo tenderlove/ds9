@@ -9,6 +9,7 @@ Hoe.plugin :gemspec # `gem install hoe-gemspec`
 Hoe.plugin :git     # `gem install hoe-git`
 
 gem 'rake-compiler', '>= 0.4.1'
+require "rake/extensiontask"
 
 Hoe.spec 'gorby' do
   developer('Aaron Patterson', 'aaron@tenderlovemaking.com')
