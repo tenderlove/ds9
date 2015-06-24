@@ -5,11 +5,15 @@ module Gorby
 
   class Session
 
-    private
+    #private
 
-    def send_callback string
-      # not sure what to do with this yet
-      string.length
-    end
+    #def send_callback string
+    #  # not sure what to do with this yet
+    #  string.length
+    #end
+
+    #def recv_callback length
+    #  raise NotImplementedError
+    #end
   end
 end
