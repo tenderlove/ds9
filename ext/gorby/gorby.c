@@ -459,6 +459,7 @@ void Init_gorby(void)
     rb_define_method(cGorbySession, "terminate_session", session_terminate_session, 1);
 
     rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
+    rb_define_private_method(cGorbySession, "make_callbacks", 1, make_callbacks);
 }
 
 /* vim: set noet sws=4 sw=4: */
