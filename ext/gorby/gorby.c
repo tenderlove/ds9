@@ -13,7 +13,7 @@ static ssize_t send_callback(nghttp2_session * session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("send_callback"), 1, rb_str_new(data, length));
+    ret = rb_funcall(self, rb_intern("send_event"), 1, rb_str_new(data, length));
 
     return NUM2INT(ret);
 }
@@ -75,7 +75,15 @@ static int on_begin_headers_callback(nghttp2_session *session,
 			             const nghttp2_frame *frame,
 			             void *user_data)
 {
-    printf("on_begin_headers_callback\n");
+    VALUE self = (VALUE)user_data;
+
+    VALUE ret = rb_funcall(self, rb_intern("on_begin_headers"), 1,
+	    WrapGorbyFrame(frame));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -87,7 +95,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
     VALUE ret;
     ssize_t len;
 
-    ret = rb_funcall(self, rb_intern("recv_callback"), 1, INT2NUM(length));
+    ret = rb_funcall(self, rb_intern("recv_event"), 1, INT2NUM(length));
 
     if (FIXNUM_P(ret)) {
 	return NUM2INT(ret);
@@ -153,7 +161,17 @@ static int on_invalid_frame_recv_callback(nghttp2_session *session,
 					  const nghttp2_frame *frame, uint32_t lib_error_code,
 					  void *user_data)
 {
-    printf("on_invalid_frame_recv_callback\n");
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("on_invalid_frame_recv"), 2,
+	    WrapGorbyFrame(frame),
+	    INT2NUM(lib_error_code));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 

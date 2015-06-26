@@ -25,19 +25,67 @@ module Gorby
   end
 
   class Session
+    attr_reader :target
+
+    def initialize target
+      @target = target
+      cbs = make_callbacks callbacks
+      init_internals cbs
+    end
 
     private
 
-    def send_callback string
-      # not sure what to do with this yet
-      string.length
+    def callbacks
+      CALLBACKS
+    end
+
+    def send_event string
+      @target.send_event string
+    end
+
+    def on_frame_recv frame
+      @target.on_frame_recv frame
+    end
+
+    def on_stream_close id, error_code
+      @target.on_stream_close id, error_code
+    end
+
+    def on_header name, value, frame, flags
+      @target.on_header name, value, frame, flags
+    end
+
+    def on_begin_headers frame
+      @target.on_begin_headers frame
+    end
+
+    def recv_event length
+      @target.recv_event length
+    end
+
+    def on_begin_frame frame
+      @target.on_begin_frame frame
+    end
+
+    def on_data_chunk_recv id, data, flags
+      @target.on_data_chunk_recv id, data, flags
+    end
+
+    def on_invalid_frame_recv frame, error_code
+      @target.on_invalid_frame_recv frame, error_code
     end
 
     def on_frame_send frame
+      @target.on_frame_send frame
     end
 
-    #def recv_callback length
-    #  raise NotImplementedError
-    #end
+    def on_frame_not_send frame, reason
+      @target.on_frame_not_send frame, reason
+    end
+
+    CALLBACKS = private_instance_methods(false).find_all { |m|
+      m =~ /^on_|event$/
+    }
+
   end
 end
