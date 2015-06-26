@@ -14,7 +14,6 @@ static ssize_t send_callback(nghttp2_session * session,
     VALUE ret;
 
     ret = rb_funcall(self, rb_intern("send_callback"), 1, rb_str_new(data, length));
-    printf("RETURNING: %d\n", NUM2INT(ret));
 
     return NUM2INT(ret);
 }
@@ -194,7 +193,6 @@ static int on_frame_not_send_callback(nghttp2_session *session,
 
 static VALUE allocate_session(VALUE klass)
 {
-    printf("SERVER\n");
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
     VALUE rb_session;
