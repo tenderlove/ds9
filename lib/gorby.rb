@@ -71,9 +71,6 @@ module Gorby
 
     private
 
-    def init_internals callbacks
-    end
-
     def callbacks
       CALLBACKS
     end

@@ -212,11 +212,15 @@ static int on_frame_not_send_callback(nghttp2_session *session,
 
 static VALUE allocate_session(VALUE klass)
 {
+    return TypedData_Wrap_Struct(klass, &gorby_session_type, 0);
+}
+
+static VALUE session_init_internals(VALUE self, VALUE cb)
+{
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
-    VALUE rb_session;
 
-    nghttp2_session_callbacks_new(&callbacks);
+    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &gorby_callbacks_type, callbacks);
 
     nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
     nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
@@ -231,14 +235,10 @@ static VALUE allocate_session(VALUE klass)
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
 
-    rb_session = TypedData_Wrap_Struct(klass, &gorby_session_type, 0);
+    nghttp2_session_client_new(&session, callbacks, (void *)self);
+    DATA_PTR(self) = session;
 
-    nghttp2_session_client_new(&session, callbacks, (void *)rb_session);
-    DATA_PTR(rb_session) = session;
-
-    nghttp2_session_callbacks_del(callbacks);
-
-    return rb_session;
+    return self;
 }
 
 static VALUE session_want_write_p(VALUE self)
@@ -473,6 +473,7 @@ void Init_gorby(void)
 
     rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
     rb_define_private_method(cGorbySession, "make_callbacks", make_callbacks, 1);
+    rb_define_private_method(cGorbySession, "init_internals", session_init_internals, 1);
 }
 
 /* vim: set noet sws=4 sw=4: */
