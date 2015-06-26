@@ -40,6 +40,16 @@ static VALUE frame_type_class(nghttp2_frame *frame)
     }
 }
 
+VALUE WrapGorbyFrameHeader(const nghttp2_frame_hd *hd)
+{
+    VALUE klass = rb_const_get(cGorbyFramesFrame, rb_intern("Header"));
+    return rb_funcall(klass, rb_intern("new"), 4,
+	    INT2NUM(hd->length),
+	    INT2NUM(hd->stream_id),
+	    INT2NUM(hd->type),
+	    INT2NUM(hd->flags));
+}
+
 VALUE WrapGorbyFrame(const nghttp2_frame *frame)
 {
     /* dup the frame so Ruby can manage the struct's memory */
@@ -47,14 +57,6 @@ VALUE WrapGorbyFrame(const nghttp2_frame *frame)
     memcpy(dup, frame, sizeof(nghttp2_frame));
 
     return TypedData_Wrap_Struct(frame_type_class(dup), &gorby_frame_type, dup);
-}
-
-static VALUE frame_length(VALUE self)
-{
-    nghttp2_frame *frame;
-    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
-
-    return INT2NUM(frame->hd.length);
 }
 
 static VALUE frame_stream_id(VALUE self)
@@ -81,6 +83,14 @@ static VALUE frame_flags(VALUE self)
     return INT2NUM(frame->hd.flags);
 }
 
+static VALUE frame_header(VALUE self)
+{
+    nghttp2_frame *frame;
+    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
+
+    return WrapGorbyFrameHeader((nghttp2_frame_hd *)frame);
+}
+
 void Init_gorby_frames(VALUE mGorby)
 {
     mGorbyFrames = rb_define_module_under(mGorby, "Frames");
@@ -97,10 +107,10 @@ void Init_gorby_frames(VALUE mGorby)
     cGorbyFramesWindowUpdate = rb_define_class_under(mGorbyFrames, "WindowUpdate", cGorbyFramesFrame);
     cGorbyFramesContinuation = rb_define_class_under(mGorbyFrames, "Continuation", cGorbyFramesFrame);
 
-    rb_define_method(cGorbyFramesFrame, "length", frame_length, 0);
     rb_define_method(cGorbyFramesFrame, "stream_id", frame_stream_id, 0);
     rb_define_method(cGorbyFramesFrame, "type", frame_type, 0);
     rb_define_method(cGorbyFramesFrame, "flags", frame_flags, 0);
+    rb_define_method(cGorbyFramesFrame, "header", frame_header, 0);
 }
 
 /* vim: set noet sws=4 sw=4: */

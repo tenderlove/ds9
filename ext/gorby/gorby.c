@@ -5,15 +5,6 @@ VALUE mGorby;
 VALUE cGorbySession;
 VALUE eGorbyException;
 
-static const rb_data_type_t gorby_session_type = {
-    "Gorby/session",
-    {0, nghttp2_session_del, 0,},
-    0, 0,
-#ifdef RUBY_TYPED_FREE_IMMEDIATELY
-    RUBY_TYPED_FREE_IMMEDIATELY,
-#endif
-};
-
 static ssize_t send_callback(nghttp2_session * session,
 			     const uint8_t *data,
 			     size_t length,
@@ -23,6 +14,7 @@ static ssize_t send_callback(nghttp2_session * session,
     VALUE ret;
 
     ret = rb_funcall(self, rb_intern("send_callback"), 1, rb_str_new(data, length));
+    printf("RETURNING: %d\n", NUM2INT(ret));
 
     return NUM2INT(ret);
 }
@@ -31,7 +23,15 @@ static int on_frame_recv_callback(nghttp2_session *session,
 				  const nghttp2_frame *frame,
 				  void *user_data)
 {
-    printf("on_frame_recv_callback\n");
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("on_frame_recv"), 1, WrapGorbyFrame(frame));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -40,7 +40,14 @@ static int on_stream_close_callback(nghttp2_session *session,
 				    uint32_t error_code,
 				    void *user_data)
 {
-    printf("on_stream_close_callback\n");
+    VALUE self = (VALUE)user_data;
+
+    VALUE ret = rb_funcall(self, rb_intern("on_stream_close"), 2, INT2NUM(stream_id), INT2NUM(error_code));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -50,7 +57,18 @@ static int on_header_callback(nghttp2_session *session,
 			      const uint8_t *value, size_t valuelen,
 			      uint8_t flags, void *user_data)
 {
-    printf("on_header_callback\n");
+    VALUE self = (VALUE)user_data;
+
+    VALUE ret = rb_funcall(self, rb_intern("on_header"), 4,
+	    rb_str_new(name, namelen),
+	    rb_str_new(value, valuelen),
+	    WrapGorbyFrame(frame),
+	    INT2NUM(flags));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -78,7 +96,19 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 
     len = RSTRING_LEN(ret);
 
-    strncpy(buf, StringValuePtr(ret), len);
+    memcpy(buf, StringValuePtr(ret), len);
+
+    /*
+    printf("BUF DEBUG: ");
+      int i;
+for (i = 0; i < len; i++)
+{
+    if (i > 0) printf(":");
+    printf("%02X", buf[i]);
+}
+printf(", %d\n", len);
+*/
+
 
     return len;
 }
@@ -87,7 +117,15 @@ static int on_begin_frame_callback(nghttp2_session *session,
 				   const nghttp2_frame_hd *hd,
 				   void *user_data)
 {
-    printf("on_begin_frame_callback\n");
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("on_begin_frame"), 1, WrapGorbyFrameHeader(hd));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -97,7 +135,18 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
 				       const uint8_t *data,
 				       size_t len, void *user_data)
 {
-    printf("on_data_chunk_recv_callback\n");
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("on_data_chunk_recv"), 3,
+	    INT2NUM(stream_id),
+	    rb_str_new(data, len),
+	    INT2NUM(flags));
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
@@ -130,12 +179,22 @@ static int on_frame_not_send_callback(nghttp2_session *session,
 				      int lib_error_code,
 				      void *user_data)
 {
-    printf("on_frame_not_send\n");
+    VALUE self = (VALUE)user_data;
+    VALUE reason = rb_str_new2(nghttp2_strerror(lib_error_code));
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("on_frame_not_send"), 2, WrapGorbyFrame(frame), reason);
+
+    if (ret == Qfalse) {
+	return 1;
+    }
+
     return 0;
 }
 
 static VALUE allocate_session(VALUE klass)
 {
+    printf("SERVER\n");
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
     VALUE rb_session;
@@ -144,21 +203,20 @@ static VALUE allocate_session(VALUE klass)
 
     nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
     nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
-    nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
-    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
-    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
     nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
-    nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
-
-    nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
-    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
     nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
     nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
 
+    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
+    nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
+    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
+    nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
+    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
+    nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
 
     rb_session = TypedData_Wrap_Struct(klass, &gorby_session_type, 0);
 
-    nghttp2_session_server_new(&session, callbacks, (void *)rb_session);
+    nghttp2_session_client_new(&session, callbacks, (void *)rb_session);
     DATA_PTR(rb_session) = session;
 
     nghttp2_session_callbacks_del(callbacks);
@@ -298,6 +356,62 @@ static VALUE session_outbound_queue_size(VALUE self)
     return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
+static VALUE session_submit_request(VALUE self, VALUE request)
+{
+    VALUE settings;
+    size_t niv, i;
+    nghttp2_nv *nva, *head;
+    nghttp2_session *session;
+    int rv;
+
+    settings = rb_funcall(request, rb_intern("headers"), 0);
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    niv = RARRAY_LEN(settings);
+    nva = xcalloc(nva, sizeof(nghttp2_nv));
+    head = nva;
+
+    for(i = 0; i < niv; i++, head++) {
+	VALUE tuple = rb_ary_entry(settings, (long)i);
+	VALUE name = rb_ary_entry(tuple, 0);
+	VALUE value = rb_ary_entry(tuple, 1);
+
+	head->name = StringValuePtr(name);
+	head->namelen = RSTRING_LEN(name);
+
+	head->value = StringValuePtr(value);
+	head->valuelen = RSTRING_LEN(value);
+	head->flags = NGHTTP2_NV_FLAG_NONE;
+    }
+
+    rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
+
+    xfree(nva);
+
+    if (rv < 0) {
+	rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+    }
+
+    return INT2NUM(rv);
+}
+
+static VALUE session_terminate_session(VALUE self, VALUE err)
+{
+    int rv;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    rv = nghttp2_session_terminate_session(session, NUM2INT(err));
+
+    if (rv != 0) {
+	rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+    }
+
+    return self;
+}
+
 void Init_gorby(void)
 {
     mGorby = rb_define_module("Gorby");
@@ -313,6 +427,7 @@ void Init_gorby(void)
     rb_define_const(mGorbySettings, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE));
     rb_define_const(mGorby, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mGorby, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
+    rb_define_const(mGorby, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mGorby, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
 
     cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
@@ -325,6 +440,9 @@ void Init_gorby(void)
     rb_define_method(cGorbySession, "mem_receive", session_mem_receive, 1);
     rb_define_method(cGorbySession, "mem_send", session_mem_send, 0);
     rb_define_method(cGorbySession, "outbound_queue_size", session_outbound_queue_size, 0);
+    rb_define_method(cGorbySession, "terminate_session", session_terminate_session, 1);
+
+    rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
 }
 
 /* vim: set noet sws=4 sw=4: */
