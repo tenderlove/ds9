@@ -3,6 +3,7 @@
 
 VALUE mGorby;
 VALUE cGorbySession;
+VALUE cGorbyCallbacks;
 VALUE eGorbyException;
 
 static ssize_t send_callback(nghttp2_session * session,
@@ -428,6 +429,14 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     return self;
 }
 
+static VALUE make_callbacks(VALUE self, VALUE callback_list)
+{
+    nghttp2_session_callbacks *callbacks;
+    nghttp2_session_callbacks_new(&callbacks);
+
+    return TypedData_Wrap_Struct(cGorbyCallbacks, &gorby_callbacks_type, callbacks);
+}
+
 void Init_gorby(void)
 {
     mGorby = rb_define_module("Gorby");
@@ -446,8 +455,12 @@ void Init_gorby(void)
     rb_define_const(mGorby, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mGorby, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
 
+    cGorbyCallbacks = rb_define_class_under(mGorby, "Callbacks", rb_cData);
+
     cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
+
     rb_define_alloc_func(cGorbySession, allocate_session);
+
     rb_define_method(cGorbySession, "want_write?", session_want_write_p, 0);
     rb_define_method(cGorbySession, "want_read?", session_want_read_p, 0);
     rb_define_method(cGorbySession, "submit_settings", session_submit_settings, 1);
@@ -459,7 +472,7 @@ void Init_gorby(void)
     rb_define_method(cGorbySession, "terminate_session", session_terminate_session, 1);
 
     rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
-    rb_define_private_method(cGorbySession, "make_callbacks", 1, make_callbacks);
+    rb_define_private_method(cGorbySession, "make_callbacks", make_callbacks, 1);
 }
 
 /* vim: set noet sws=4 sw=4: */

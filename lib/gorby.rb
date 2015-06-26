@@ -24,6 +24,42 @@ module Gorby
     end
   end
 
+  class Events
+    def send_event string
+      string.length
+    end
+
+    def on_frame_recv frame
+    end
+
+    def on_stream_close id, error_code
+    end
+
+    def on_header name, value, frame, flags
+    end
+
+    def on_begin_headers frame
+    end
+
+    def recv_event length
+    end
+
+    def on_begin_frame frame
+    end
+
+    def on_data_chunk_recv id, data, flags
+    end
+
+    def on_invalid_frame_recv frame, error_code
+    end
+
+    def on_frame_send frame
+    end
+
+    def on_frame_not_send frame, reason
+    end
+  end
+
   class Session
     attr_reader :target
 
@@ -34,6 +70,9 @@ module Gorby
     end
 
     private
+
+    def init_internals callbacks
+    end
 
     def callbacks
       CALLBACKS
