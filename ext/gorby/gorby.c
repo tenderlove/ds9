@@ -102,6 +102,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 	return NUM2INT(ret);
     }
 
+    Check_Type(ret, T_STRING);
     len = RSTRING_LEN(ret);
 
     memcpy(buf, StringValuePtr(ret), len);
