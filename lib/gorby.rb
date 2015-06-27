@@ -70,7 +70,4 @@ module Gorby
     def on_frame_not_send frame, reason
     end
   end
-
-  class Client < Session
-  end
 end

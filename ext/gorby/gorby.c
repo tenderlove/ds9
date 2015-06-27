@@ -3,6 +3,8 @@
 
 VALUE mGorby;
 VALUE cGorbySession;
+VALUE cGorbyClient;
+VALUE cGorbyServer;
 VALUE cGorbyCallbacks;
 VALUE eGorbyException;
 
@@ -216,27 +218,27 @@ static VALUE allocate_session(VALUE klass)
     return TypedData_Wrap_Struct(klass, &gorby_session_type, 0);
 }
 
-static VALUE session_init_internals(VALUE self, VALUE cb)
+static VALUE client_init_internals(VALUE self, VALUE cb)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &gorby_callbacks_type, callbacks);
 
-    nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
-    nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
-    nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
-    nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
-    nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
-
-    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
-    nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
-    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
-    nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
-    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
-    nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
-
     nghttp2_session_client_new(&session, callbacks, (void *)self);
+    DATA_PTR(self) = session;
+
+    return self;
+}
+
+static VALUE server_init_internals(VALUE self, VALUE cb)
+{
+    nghttp2_session_callbacks *callbacks;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &gorby_callbacks_type, callbacks);
+
+    nghttp2_session_server_new(&session, callbacks, (void *)self);
     DATA_PTR(self) = session;
 
     return self;
@@ -435,6 +437,19 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     nghttp2_session_callbacks *callbacks;
     nghttp2_session_callbacks_new(&callbacks);
 
+    nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
+    nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
+    nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
+    nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
+    nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
+
+    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
+    nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
+    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
+    nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
+    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
+    nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
+
     return TypedData_Wrap_Struct(cGorbyCallbacks, &gorby_callbacks_type, callbacks);
 }
 
@@ -459,6 +474,8 @@ void Init_gorby(void)
     cGorbyCallbacks = rb_define_class_under(mGorby, "Callbacks", rb_cData);
 
     cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
+    cGorbyClient = rb_define_class_under(mGorby, "Client", cGorbySession);
+    cGorbyServer = rb_define_class_under(mGorby, "Server", cGorbySession);
 
     rb_define_alloc_func(cGorbySession, allocate_session);
 
@@ -474,7 +491,8 @@ void Init_gorby(void)
 
     rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
     rb_define_private_method(cGorbySession, "make_callbacks", make_callbacks, 1);
-    rb_define_private_method(cGorbySession, "init_internals", session_init_internals, 1);
+    rb_define_private_method(cGorbyClient, "init_internals", client_init_internals, 1);
+    rb_define_private_method(cGorbyServer, "init_internals", server_init_internals, 1);
 }
 
 /* vim: set noet sws=4 sw=4: */
