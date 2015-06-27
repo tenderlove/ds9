@@ -33,7 +33,7 @@ module Gorby
     private
 
     def callbacks
-      self.class.instance_methods(false).grep(/^on_|event$/)
+      Session.instance_methods(false).grep(/^on_|event$/)
     end
 
     def send_event string
