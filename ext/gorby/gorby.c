@@ -432,6 +432,70 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     return self;
 }
 
+static ssize_t rb_data_read_callback(nghttp2_session *session,
+				     int32_t stream_id, uint8_t *buf,
+				     size_t length, uint32_t *data_flags,
+				     nghttp2_data_source *source, void *user_data)
+{
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+    ssize_t len;
+
+    ret = rb_funcall(self, rb_intern("on_data_source_read"), 2, INT2NUM(stream_id),
+	    INT2NUM(length));
+
+    if (NIL_P(ret)) {
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	return 0;
+    }
+
+    Check_Type(ret, T_STRING);
+    len = RSTRING_LEN(ret);
+    memcpy(buf, StringValuePtr(ret), len);
+
+    return len;
+}
+
+static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
+{
+    nghttp2_session *session;
+    size_t niv, i;
+    nghttp2_nv *nva, *head;
+    nghttp2_data_provider provider;
+    int rv;
+
+    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+
+    niv = RARRAY_LEN(headers);
+    nva = xcalloc(nva, sizeof(nghttp2_nv));
+    head = nva;
+
+    for(i = 0; i < niv; i++, head++) {
+	VALUE tuple = rb_ary_entry(headers, (long)i);
+	VALUE name = rb_ary_entry(tuple, 0);
+	VALUE value = rb_ary_entry(tuple, 1);
+
+	head->name = StringValuePtr(name);
+	head->namelen = RSTRING_LEN(name);
+
+	head->value = StringValuePtr(value);
+	head->valuelen = RSTRING_LEN(value);
+	head->flags = NGHTTP2_NV_FLAG_NONE;
+    }
+
+    provider.read_callback = rb_data_read_callback;
+
+    rv = nghttp2_submit_response(session, NUM2INT(stream_id), nva, niv, &provider);
+
+    xfree(nva);
+
+    if (0 != rv) {
+	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+    }
+
+    return self;
+}
+
 static VALUE make_callbacks(VALUE self, VALUE callback_list)
 {
     nghttp2_session_callbacks *callbacks;
@@ -493,6 +557,8 @@ void Init_gorby(void)
     rb_define_private_method(cGorbySession, "make_callbacks", make_callbacks, 1);
     rb_define_private_method(cGorbyClient, "init_internals", client_init_internals, 1);
     rb_define_private_method(cGorbyServer, "init_internals", server_init_internals, 1);
+
+    rb_define_method(cGorbyServer, "submit_response", server_submit_response, 2);
 }
 
 /* vim: set noet sws=4 sw=4: */

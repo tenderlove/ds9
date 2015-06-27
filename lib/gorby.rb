@@ -40,6 +40,9 @@ module Gorby
       string.length
     end
 
+    def on_data_source_read stream_id, length
+    end
+
     def on_frame_recv frame
     end
 
