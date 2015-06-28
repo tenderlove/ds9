@@ -376,20 +376,18 @@ static VALUE session_outbound_queue_size(VALUE self)
     return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
-static VALUE session_submit_request(VALUE self, VALUE request)
+static VALUE session_submit_request(VALUE self, VALUE settings)
 {
-    VALUE settings;
     size_t niv, i;
     nghttp2_nv *nva, *head;
     nghttp2_session *session;
     int rv;
 
-    settings = rb_funcall(request, rb_intern("headers"), 0);
-
     TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
 
+    Check_Type(settings, T_ARRAY);
     niv = RARRAY_LEN(settings);
-    nva = xcalloc(nva, sizeof(nghttp2_nv));
+    nva = xcalloc(niv, sizeof(nghttp2_nv));
     head = nva;
 
     for(i = 0; i < niv; i++, head++) {
