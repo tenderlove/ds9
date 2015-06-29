@@ -1,10 +1,10 @@
-#ifndef GORBY_H
-#define GORBY_H
+#ifndef DS9_H
+#define DS9_H
 
 #include <ruby.h>
 #include <nghttp2/nghttp2.h>
 
-static const rb_data_type_t gorby_session_type = {
+static const rb_data_type_t ds9_session_type = {
     "DS9/session",
     {0, (void (*)(void *))nghttp2_session_del, 0,},
     0, 0,
@@ -13,7 +13,7 @@ static const rb_data_type_t gorby_session_type = {
 #endif
 };
 
-static const rb_data_type_t gorby_callbacks_type = {
+static const rb_data_type_t ds9_callbacks_type = {
     "DS9/callbacks",
     {0, (void (*)(void *))nghttp2_session_callbacks_del, 0,},
     0, 0,
@@ -22,8 +22,8 @@ static const rb_data_type_t gorby_callbacks_type = {
 #endif
 };
 
-void Init_gorby_client(VALUE mDS9, VALUE cDS9Session);
-void Init_gorby_frames(VALUE mDS9);
+void Init_ds9_client(VALUE mDS9, VALUE cDS9Session);
+void Init_ds9_frames(VALUE mDS9);
 VALUE WrapDS9Frame(const nghttp2_frame *frame);
 VALUE WrapDS9FrameHeader(const nghttp2_frame_hd *hd);
 

@@ -1,4 +1,4 @@
-#include <gorby.h>
+#include <ds9.h>
 
 VALUE mDS9Frames;
 
@@ -14,7 +14,7 @@ VALUE cDS9FramesGoaway;
 VALUE cDS9FramesWindowUpdate;
 VALUE cDS9FramesContinuation;
 
-static const rb_data_type_t gorby_frame_type = {
+static const rb_data_type_t ds9_frame_type = {
     "DS9/frame",
     {0, xfree, 0,},
     0, 0,
@@ -56,13 +56,13 @@ VALUE WrapDS9Frame(const nghttp2_frame *frame)
     nghttp2_frame *dup = xmalloc(sizeof(nghttp2_frame));
     memcpy(dup, frame, sizeof(nghttp2_frame));
 
-    return TypedData_Wrap_Struct(frame_type_class(dup), &gorby_frame_type, dup);
+    return TypedData_Wrap_Struct(frame_type_class(dup), &ds9_frame_type, dup);
 }
 
 static VALUE frame_stream_id(VALUE self)
 {
     nghttp2_frame *frame;
-    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
 
     return INT2NUM(frame->hd.stream_id);
 }
@@ -70,7 +70,7 @@ static VALUE frame_stream_id(VALUE self)
 static VALUE frame_type(VALUE self)
 {
     nghttp2_frame *frame;
-    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
 
     return INT2NUM(frame->hd.type);
 }
@@ -78,7 +78,7 @@ static VALUE frame_type(VALUE self)
 static VALUE frame_flags(VALUE self)
 {
     nghttp2_frame *frame;
-    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
 
     return INT2NUM(frame->hd.flags);
 }
@@ -86,12 +86,12 @@ static VALUE frame_flags(VALUE self)
 static VALUE frame_header(VALUE self)
 {
     nghttp2_frame *frame;
-    TypedData_Get_Struct(self, nghttp2_frame, &gorby_frame_type, frame);
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
 
     return WrapDS9FrameHeader((nghttp2_frame_hd *)frame);
 }
 
-void Init_gorby_frames(VALUE mDS9)
+void Init_ds9_frames(VALUE mDS9)
 {
     mDS9Frames = rb_define_module_under(mDS9, "Frames");
     cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cData);

@@ -1,4 +1,4 @@
-#include <gorby.h>
+#include <ds9.h>
 #include <assert.h>
 
 VALUE mDS9;
@@ -227,7 +227,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 
 static VALUE allocate_session(VALUE klass)
 {
-    return TypedData_Wrap_Struct(klass, &gorby_session_type, 0);
+    return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
 }
 
 static VALUE client_init_internals(VALUE self, VALUE cb)
@@ -235,7 +235,7 @@ static VALUE client_init_internals(VALUE self, VALUE cb)
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &gorby_callbacks_type, callbacks);
+    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
 
     nghttp2_session_client_new(&session, callbacks, (void *)self);
     DATA_PTR(self) = session;
@@ -248,7 +248,7 @@ static VALUE server_init_internals(VALUE self, VALUE cb)
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &gorby_callbacks_type, callbacks);
+    TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
 
     nghttp2_session_server_new(&session, callbacks, (void *)self);
     DATA_PTR(self) = session;
@@ -260,7 +260,7 @@ static VALUE session_want_write_p(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     if (nghttp2_session_want_write(session) == 0) {
 	return Qfalse;
@@ -273,7 +273,7 @@ static VALUE session_want_read_p(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     if (nghttp2_session_want_read(session) == 0) {
 	return Qfalse;
@@ -289,7 +289,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     nghttp2_session *session;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     niv = RARRAY_LEN(settings);
     iv = xcalloc(niv, sizeof(nghttp2_settings_entry));
@@ -317,7 +317,7 @@ static VALUE session_send(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     rv = nghttp2_session_send(session);
     if (rv != 0) {
@@ -332,7 +332,7 @@ static VALUE session_receive(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     assert(session);
     rv = nghttp2_session_recv(session);
@@ -348,7 +348,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
@@ -364,7 +364,7 @@ static VALUE session_mem_send(VALUE self)
     const uint8_t *data;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     rv = nghttp2_session_mem_send(session, &data);
 
@@ -383,7 +383,7 @@ static VALUE session_outbound_queue_size(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
@@ -395,7 +395,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
     nghttp2_session *session;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     Check_Type(settings, T_ARRAY);
     niv = RARRAY_LEN(settings);
@@ -431,7 +431,7 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     rv = nghttp2_session_terminate_session(session, NUM2INT(err));
 
@@ -450,7 +450,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     nghttp2_data_provider provider;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
 
     niv = RARRAY_LEN(headers);
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -500,14 +500,14 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
 
-    return TypedData_Wrap_Struct(cDS9Callbacks, &gorby_callbacks_type, callbacks);
+    return TypedData_Wrap_Struct(cDS9Callbacks, &ds9_callbacks_type, callbacks);
 }
 
-void Init_gorby(void)
+void Init_ds9(void)
 {
     mDS9 = rb_define_module("DS9");
 
-    Init_gorby_frames(mDS9);
+    Init_ds9_frames(mDS9);
 
     rb_define_const(mDS9, "NGHTTP2_PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
 

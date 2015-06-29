@@ -1,5 +1,5 @@
 require 'minitest/autorun'
-require 'gorby'
+require 'ds9'
 
 module DS9
   class TestCase < Minitest::Test

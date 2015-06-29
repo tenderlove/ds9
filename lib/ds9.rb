@@ -1,4 +1,4 @@
-require 'gorby.so'
+require 'ds9.so'
 
 module DS9
   VERSION = '1.0.0'

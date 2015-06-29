@@ -11,7 +11,7 @@ Hoe.plugin :git     # `gem install hoe-git`
 gem 'rake-compiler', '>= 0.4.1'
 require "rake/extensiontask"
 
-Hoe.spec 'gorby' do
+Hoe.spec 'ds9' do
   developer('Aaron Patterson', 'aaron@tenderlovemaking.com')
   self.readme_file   = 'README.md'
   self.history_file  = 'CHANGELOG.md'
@@ -22,8 +22,8 @@ Hoe.spec 'gorby' do
     :required_ruby_version => '>= 2.2.2'
   }
 
-  self.spec_extras[:extensions] = ["ext/gorby/extconf.rb"]
-  Rake::ExtensionTask.new "gorby", spec do |ext|
+  self.spec_extras[:extensions] = ["ext/ds9/extconf.rb"]
+  Rake::ExtensionTask.new "ds9", spec do |ext|
     ext.lib_dir = File.join(*['lib', ENV['FAT_DIR']].compact)
   end
 end

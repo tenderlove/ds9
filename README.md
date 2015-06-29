@@ -1,28 +1,30 @@
-= gorby
+# DS9
 
-* FIX (url)
+* https://github.com/tenderlove/ds9
 
-== DESCRIPTION:
+## DESCRIPTION:
 
-FIX (describe your package)
+This library allows you to write HTTP/2 clients and servers.  It is a wrapper
+around nghttp2.
 
-== FEATURES/PROBLEMS:
+## FEATURES/PROBLEMS:
 
-* FIX (list of features or problems)
+* Needs nghttp2
 
-== SYNOPSIS:
+## SYNOPSIS:
 
   FIX (code sample of usage)
 
-== REQUIREMENTS:
+## REQUIREMENTS:
 
-* FIX (list of requirements)
+* Needs nghttp2
 
-== INSTALL:
+## INSTALL:
 
-* FIX (sudo gem install, anything else)
+* brew install nghttp2
+* gem install ds9
 
-== LICENSE:
+## LICENSE:
 
 (The MIT License)
 

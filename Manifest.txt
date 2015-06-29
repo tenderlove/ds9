@@ -2,6 +2,6 @@ History.txt
 Manifest.txt
 README.txt
 Rakefile
-bin/gorby
-lib/gorby.rb
-test/test_gorby.rb
+bin/ds9
+lib/ds9.rb
+test/test_ds9.rb
