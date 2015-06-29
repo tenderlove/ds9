@@ -162,7 +162,7 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
 }
 
 static int on_invalid_frame_recv_callback(nghttp2_session *session,
-					  const nghttp2_frame *frame, uint32_t lib_error_code,
+					  const nghttp2_frame *frame, int lib_error_code,
 					  void *user_data)
 {
     VALUE self = (VALUE)user_data;
