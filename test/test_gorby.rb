@@ -1,46 +1,45 @@
-require 'minitest/autorun'
-require 'gorby'
+require 'helper'
 
-class TestGorby < Minitest::Test
+class TestDS9 < Minitest::Test
   def test_sanity
-    assert Gorby::NGHTTP2_PROTO_VERSION_ID
+    assert DS9::NGHTTP2_PROTO_VERSION_ID
   end
 
   def test_session_allocation
-    assert Gorby::Server.new
+    assert DS9::Server.new
   end
 
   def test_session_submit_settings
-    session = Gorby::Server.new
-    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    session = DS9::Server.new
+    session.submit_settings [[DS9::Settings::MAX_CONCURRENT_STREAMS, 100]]
   end
 
   def test_send
     called = false
-    session = Class.new(Gorby::Server) {
+    session = Class.new(DS9::Server) {
       define_method :send_event do |string|
         called = string
         string.length
       end
     }.new
 
-    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    session.submit_settings [[DS9::Settings::MAX_CONCURRENT_STREAMS, 100]]
     session.send
     assert called
   end
 
   def test_want_read?
-    session = Gorby::Server.new
-    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    session = DS9::Server.new
+    session.submit_settings [[DS9::Settings::MAX_CONCURRENT_STREAMS, 100]]
     assert_predicate session, :want_write?
   end
 
   def test_want_write?
-    session = Gorby::Server.new
-    session.submit_settings [[Gorby::Settings::MAX_CONCURRENT_STREAMS, 100]]
+    session = DS9::Server.new
+    session.submit_settings [[DS9::Settings::MAX_CONCURRENT_STREAMS, 100]]
     assert_predicate session, :want_write?
 
-    session = Gorby::Server.new
+    session = DS9::Server.new
     refute_predicate session, :want_write?
   end
 end

@@ -1,12 +1,12 @@
 #include <gorby.h>
 #include <assert.h>
 
-VALUE mGorby;
-VALUE cGorbySession;
-VALUE cGorbyClient;
-VALUE cGorbyServer;
-VALUE cGorbyCallbacks;
-VALUE eGorbyException;
+VALUE mDS9;
+VALUE cDS9Session;
+VALUE cDS9Client;
+VALUE cDS9Server;
+VALUE cDS9Callbacks;
+VALUE eDS9Exception;
 
 static ssize_t send_callback(nghttp2_session * session,
 			     const uint8_t *data,
@@ -28,7 +28,7 @@ static int on_frame_recv_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_recv"), 1, WrapGorbyFrame(frame));
+    ret = rb_funcall(self, rb_intern("on_frame_recv"), 1, WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
 	return 1;
@@ -64,7 +64,7 @@ static int on_header_callback(nghttp2_session *session,
     VALUE ret = rb_funcall(self, rb_intern("on_header"), 4,
 	    rb_usascii_str_new((const char *)name, namelen),
 	    rb_usascii_str_new((const char *)value, valuelen),
-	    WrapGorbyFrame(frame),
+	    WrapDS9Frame(frame),
 	    INT2NUM(flags));
 
     if (ret == Qfalse) {
@@ -81,7 +81,7 @@ static int on_begin_headers_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
 
     VALUE ret = rb_funcall(self, rb_intern("on_begin_headers"), 1,
-	    WrapGorbyFrame(frame));
+	    WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
 	return 1;
@@ -119,7 +119,7 @@ static int on_begin_frame_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_begin_frame"), 1, WrapGorbyFrameHeader(hd));
+    ret = rb_funcall(self, rb_intern("on_begin_frame"), 1, WrapDS9FrameHeader(hd));
 
     if (ret == Qfalse) {
 	return 1;
@@ -157,7 +157,7 @@ static int on_invalid_frame_recv_callback(nghttp2_session *session,
     VALUE ret;
 
     ret = rb_funcall(self, rb_intern("on_invalid_frame_recv"), 2,
-	    WrapGorbyFrame(frame),
+	    WrapDS9Frame(frame),
 	    INT2NUM(lib_error_code));
 
     if (ret == Qfalse) {
@@ -174,7 +174,7 @@ static int on_frame_send_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_send"), 1, WrapGorbyFrame(frame));
+    ret = rb_funcall(self, rb_intern("on_frame_send"), 1, WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
 	return 1;
@@ -192,7 +192,7 @@ static int on_frame_not_send_callback(nghttp2_session *session,
     VALUE reason = rb_str_new2(nghttp2_strerror(lib_error_code));
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_not_send"), 2, WrapGorbyFrame(frame), reason);
+    ret = rb_funcall(self, rb_intern("on_frame_not_send"), 2, WrapDS9Frame(frame), reason);
 
     if (ret == Qfalse) {
 	return 1;
@@ -306,7 +306,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     xfree(iv);
 
     if (0 != rv) {
-	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
     }
 
     return self;
@@ -321,7 +321,7 @@ static VALUE session_send(VALUE self)
 
     rv = nghttp2_session_send(session);
     if (rv != 0) {
-	rb_raise(eGorbyException, "Error SEESSION SEND: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error SEESSION SEND: %s", nghttp2_strerror(rv));
     }
 
     return self;
@@ -337,7 +337,7 @@ static VALUE session_receive(VALUE self)
     assert(session);
     rv = nghttp2_session_recv(session);
     if (rv != 0) {
-	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
     }
 
     return self;
@@ -352,7 +352,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
-	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
     }
 
     return INT2NUM(rv);
@@ -373,7 +373,7 @@ static VALUE session_mem_send(VALUE self)
     }
 
     if (rv < 0) {
-	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
     }
 
     return rb_str_new((const char *)data, rv);
@@ -476,7 +476,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     xfree(nva);
 
     if (0 != rv) {
-	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
+	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
     }
 
     return self;
@@ -500,51 +500,51 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
 
-    return TypedData_Wrap_Struct(cGorbyCallbacks, &gorby_callbacks_type, callbacks);
+    return TypedData_Wrap_Struct(cDS9Callbacks, &gorby_callbacks_type, callbacks);
 }
 
 void Init_gorby(void)
 {
-    mGorby = rb_define_module("Gorby");
+    mDS9 = rb_define_module("DS9");
 
-    Init_gorby_frames(mGorby);
+    Init_gorby_frames(mDS9);
 
-    rb_define_const(mGorby, "NGHTTP2_PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
+    rb_define_const(mDS9, "NGHTTP2_PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
 
-    eGorbyException = rb_define_class_under(mGorby, "Exception", rb_eStandardError);
+    eDS9Exception = rb_define_class_under(mDS9, "Exception", rb_eStandardError);
 
-    VALUE mGorbySettings = rb_define_module_under(mGorby, "Settings");
-    rb_define_const(mGorbySettings, "MAX_CONCURRENT_STREAMS", INT2NUM(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS));
-    rb_define_const(mGorbySettings, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE));
-    rb_define_const(mGorby, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
-    rb_define_const(mGorby, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
-    rb_define_const(mGorby, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
-    rb_define_const(mGorby, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
+    VALUE mDS9Settings = rb_define_module_under(mDS9, "Settings");
+    rb_define_const(mDS9Settings, "MAX_CONCURRENT_STREAMS", INT2NUM(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS));
+    rb_define_const(mDS9Settings, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE));
+    rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
+    rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
+    rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
+    rb_define_const(mDS9, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
 
-    cGorbyCallbacks = rb_define_class_under(mGorby, "Callbacks", rb_cData);
+    cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cData);
 
-    cGorbySession = rb_define_class_under(mGorby, "Session", rb_cObject);
-    cGorbyClient = rb_define_class_under(mGorby, "Client", cGorbySession);
-    cGorbyServer = rb_define_class_under(mGorby, "Server", cGorbySession);
+    cDS9Session = rb_define_class_under(mDS9, "Session", rb_cObject);
+    cDS9Client = rb_define_class_under(mDS9, "Client", cDS9Session);
+    cDS9Server = rb_define_class_under(mDS9, "Server", cDS9Session);
 
-    rb_define_alloc_func(cGorbySession, allocate_session);
+    rb_define_alloc_func(cDS9Session, allocate_session);
 
-    rb_define_method(cGorbySession, "want_write?", session_want_write_p, 0);
-    rb_define_method(cGorbySession, "want_read?", session_want_read_p, 0);
-    rb_define_method(cGorbySession, "submit_settings", session_submit_settings, 1);
-    rb_define_method(cGorbySession, "send", session_send, 0);
-    rb_define_method(cGorbySession, "receive", session_receive, 0);
-    rb_define_method(cGorbySession, "mem_receive", session_mem_receive, 1);
-    rb_define_method(cGorbySession, "mem_send", session_mem_send, 0);
-    rb_define_method(cGorbySession, "outbound_queue_size", session_outbound_queue_size, 0);
-    rb_define_method(cGorbySession, "terminate_session", session_terminate_session, 1);
+    rb_define_method(cDS9Session, "want_write?", session_want_write_p, 0);
+    rb_define_method(cDS9Session, "want_read?", session_want_read_p, 0);
+    rb_define_method(cDS9Session, "submit_settings", session_submit_settings, 1);
+    rb_define_method(cDS9Session, "send", session_send, 0);
+    rb_define_method(cDS9Session, "receive", session_receive, 0);
+    rb_define_method(cDS9Session, "mem_receive", session_mem_receive, 1);
+    rb_define_method(cDS9Session, "mem_send", session_mem_send, 0);
+    rb_define_method(cDS9Session, "outbound_queue_size", session_outbound_queue_size, 0);
+    rb_define_method(cDS9Session, "terminate_session", session_terminate_session, 1);
 
-    rb_define_method(cGorbySession, "submit_request", session_submit_request, 1);
-    rb_define_private_method(cGorbySession, "make_callbacks", make_callbacks, 1);
-    rb_define_private_method(cGorbyClient, "init_internals", client_init_internals, 1);
-    rb_define_private_method(cGorbyServer, "init_internals", server_init_internals, 1);
+    rb_define_method(cDS9Session, "submit_request", session_submit_request, 1);
+    rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 1);
+    rb_define_private_method(cDS9Client, "init_internals", client_init_internals, 1);
+    rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 1);
 
-    rb_define_method(cGorbyServer, "submit_response", server_submit_response, 2);
+    rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
 }
 
 /* vim: set noet sws=4 sw=4: */

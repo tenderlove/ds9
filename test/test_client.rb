@@ -1,6 +1,6 @@
 require 'helper'
 
-class TestClient < Gorby::TestCase
+class TestClient < DS9::TestCase
   def test_request
     body = 'omglolwut'
 

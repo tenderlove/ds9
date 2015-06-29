@@ -1,6 +1,6 @@
 require 'gorby.so'
 
-module Gorby
+module DS9
   VERSION = '1.0.0'
 
   module Frames

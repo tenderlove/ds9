@@ -1,7 +1,7 @@
 require 'minitest/autorun'
 require 'gorby'
 
-module Gorby
+module DS9
   class TestCase < Minitest::Test
     def make_server settings = [], &block
       rd1, wr1 = IO.pipe
@@ -31,7 +31,7 @@ module Gorby
     end
 
     def assert_finish server, client
-      client.terminate_session Gorby::NO_ERROR
+      client.terminate_session DS9::NO_ERROR
 
       while server.want_read? || server.want_write?
         client.send
@@ -57,16 +57,16 @@ module Gorby
       def recv_event length
         case data = reader.read_nonblock(length, nil, exception: false)
         when :wait_readable
-          Gorby::ERR_WOULDBLOCK
+          DS9::ERR_WOULDBLOCK
         when nil
-          Gorby::ERR_EOF
+          DS9::ERR_EOF
         else
           data
         end
       end
     end
 
-    class Client < Gorby::Client
+    class Client < DS9::Client
       include IOEvents
 
       attr_reader :responses, :response_queue
@@ -94,7 +94,7 @@ module Gorby
       end
     end
 
-    class Server < Gorby::Server
+    class Server < DS9::Server
       include IOEvents
 
       def initialize read, write, rack_app
