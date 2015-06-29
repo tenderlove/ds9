@@ -16,7 +16,7 @@ static ssize_t send_callback(nghttp2_session * session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("send_event"), 1, rb_str_new(data, length));
+    ret = rb_funcall(self, rb_intern("send_event"), 1, rb_str_new((const char *)data, length));
 
     return NUM2INT(ret);
 }
@@ -62,8 +62,8 @@ static int on_header_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
 
     VALUE ret = rb_funcall(self, rb_intern("on_header"), 4,
-	    rb_str_new(name, namelen),
-	    rb_str_new(value, valuelen),
+	    rb_usascii_str_new((const char *)name, namelen),
+	    rb_usascii_str_new((const char *)value, valuelen),
 	    WrapGorbyFrame(frame),
 	    INT2NUM(flags));
 
@@ -151,7 +151,7 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
 
     ret = rb_funcall(self, rb_intern("on_data_chunk_recv"), 3,
 	    INT2NUM(stream_id),
-	    rb_str_new(data, len),
+	    rb_str_new((const char *)data, len),
 	    INT2NUM(flags));
 
     if (ret == Qfalse) {
@@ -338,7 +338,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
 
-    rv = nghttp2_session_mem_recv(session, StringValuePtr(buf), RSTRING_LEN(buf));
+    rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
 	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
     }
@@ -349,7 +349,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 static VALUE session_mem_send(VALUE self)
 {
     ssize_t rv;
-    uint8_t *data;
+    const uint8_t *data;
     nghttp2_session *session;
 
     TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
@@ -364,7 +364,7 @@ static VALUE session_mem_send(VALUE self)
 	rb_raise(eGorbyException, "Error: %s", nghttp2_strerror(rv));
     }
 
-    return rb_str_new(data, rv);
+    return rb_str_new((const char *)data, rv);
 }
 
 static VALUE session_outbound_queue_size(VALUE self)
@@ -395,10 +395,10 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
 	VALUE name = rb_ary_entry(tuple, 0);
 	VALUE value = rb_ary_entry(tuple, 1);
 
-	head->name = StringValuePtr(name);
+	head->name = (uint8_t *)StringValuePtr(name);
 	head->namelen = RSTRING_LEN(name);
 
-	head->value = StringValuePtr(value);
+	head->value = (uint8_t *)StringValuePtr(value);
 	head->valuelen = RSTRING_LEN(value);
 	head->flags = NGHTTP2_NV_FLAG_NONE;
     }
@@ -465,7 +465,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     TypedData_Get_Struct(self, nghttp2_session, &gorby_session_type, session);
 
     niv = RARRAY_LEN(headers);
-    nva = xcalloc(nva, sizeof(nghttp2_nv));
+    nva = xcalloc(niv, sizeof(nghttp2_nv));
     head = nva;
 
     for(i = 0; i < niv; i++, head++) {
@@ -473,10 +473,10 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 	VALUE name = rb_ary_entry(tuple, 0);
 	VALUE value = rb_ary_entry(tuple, 1);
 
-	head->name = StringValuePtr(name);
+	head->name = (uint8_t *)StringValuePtr(name);
 	head->namelen = RSTRING_LEN(name);
 
-	head->value = StringValuePtr(value);
+	head->value = (uint8_t *)StringValuePtr(value);
 	head->valuelen = RSTRING_LEN(value);
 	head->flags = NGHTTP2_NV_FLAG_NONE;
     }

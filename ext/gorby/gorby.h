@@ -6,7 +6,7 @@
 
 static const rb_data_type_t gorby_session_type = {
     "Gorby/session",
-    {0, nghttp2_session_del, 0,},
+    {0, (void (*)(void *))nghttp2_session_del, 0,},
     0, 0,
 #ifdef RUBY_TYPED_FREE_IMMEDIATELY
     RUBY_TYPED_FREE_IMMEDIATELY,
@@ -15,7 +15,7 @@ static const rb_data_type_t gorby_session_type = {
 
 static const rb_data_type_t gorby_callbacks_type = {
     "Gorby/callbacks",
-    {0, nghttp2_session_callbacks_del, 0,},
+    {0, (void (*)(void *))nghttp2_session_callbacks_del, 0,},
     0, 0,
 #ifdef RUBY_TYPED_FREE_IMMEDIATELY
     RUBY_TYPED_FREE_IMMEDIATELY,
