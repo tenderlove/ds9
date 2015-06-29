@@ -109,18 +109,6 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 
     memcpy(buf, StringValuePtr(ret), len);
 
-    /*
-    printf("BUF DEBUG: ");
-      int i;
-for (i = 0; i < len; i++)
-{
-    if (i > 0) printf(":");
-    printf("%02X", buf[i]);
-}
-printf(", %d\n", len);
-*/
-
-
     return len;
 }
 
@@ -211,6 +199,30 @@ static int on_frame_not_send_callback(nghttp2_session *session,
     }
 
     return 0;
+}
+
+static ssize_t rb_data_read_callback(nghttp2_session *session,
+				     int32_t stream_id, uint8_t *buf,
+				     size_t length, uint32_t *data_flags,
+				     nghttp2_data_source *source, void *user_data)
+{
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+    ssize_t len;
+
+    ret = rb_funcall(self, rb_intern("on_data_source_read"), 2, INT2NUM(stream_id),
+	    INT2NUM(length));
+
+    if (NIL_P(ret)) {
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	return 0;
+    }
+
+    Check_Type(ret, T_STRING);
+    len = RSTRING_LEN(ret);
+    memcpy(buf, StringValuePtr(ret), len);
+
+    return len;
 }
 
 static VALUE allocate_session(VALUE klass)
@@ -428,30 +440,6 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     }
 
     return self;
-}
-
-static ssize_t rb_data_read_callback(nghttp2_session *session,
-				     int32_t stream_id, uint8_t *buf,
-				     size_t length, uint32_t *data_flags,
-				     nghttp2_data_source *source, void *user_data)
-{
-    VALUE self = (VALUE)user_data;
-    VALUE ret;
-    ssize_t len;
-
-    ret = rb_funcall(self, rb_intern("on_data_source_read"), 2, INT2NUM(stream_id),
-	    INT2NUM(length));
-
-    if (NIL_P(ret)) {
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	return 0;
-    }
-
-    Check_Type(ret, T_STRING);
-    len = RSTRING_LEN(ret);
-    memcpy(buf, StringValuePtr(ret), len);
-
-    return len;
 }
 
 static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
