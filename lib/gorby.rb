@@ -13,6 +13,11 @@ module Gorby
 
       def settings?; false; end
       def headers?;  false; end
+      def data?;     false; end
+    end
+
+    class Data
+      def data?;     true; end
     end
 
     class Settings
@@ -37,7 +42,7 @@ module Gorby
     end
 
     def send_event string
-      string.length
+      raise NotImplementedError
     end
 
     def on_data_source_read stream_id, length
@@ -56,6 +61,7 @@ module Gorby
     end
 
     def recv_event length
+      raise NotImplementedError
     end
 
     def on_begin_frame frame

@@ -20,7 +20,7 @@ class TestGorby < Minitest::Test
     session = Class.new(Gorby::Server) {
       define_method :send_event do |string|
         called = string
-        super(string)
+        string.length
       end
     }.new
 

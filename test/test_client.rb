@@ -45,7 +45,7 @@ class TestClient < Minitest::Test
       def send_event string
         event = queue.shift
         @tc.assert_equal :WRITE, event.keys.first
-        super
+        string.length
       end
 
       def recv_event length
@@ -56,14 +56,14 @@ class TestClient < Minitest::Test
     }.new(log, self)
 
     session.submit_settings []
-    id = session.submit_request Request.new([
+    id = session.submit_request [
       [':method', 'GET'],
       [':path', '/'],
       [':scheme', 'https'],
       [':authority', ['localhost', '8080'].join(':')],
       ['accept', '*/*'],
       ['user-agent', 'test'],
-    ])
+    ]
 
     assert_equal 1, id
     while session.want_read? || session.want_write?
