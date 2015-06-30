@@ -109,6 +109,16 @@ session.run do |req, res|
 end
 ```
 
+## HACKING:
+
+On OS X:
+
+```
+$ brew install nghttp2
+$ gem install hoe rake-compiler
+$ rake compile test
+```
+
 ## REQUIREMENTS:
 
 * Needs nghttp2
