@@ -8,6 +8,26 @@ VALUE cDS9Server;
 VALUE cDS9Callbacks;
 VALUE eDS9Exception;
 
+static void * wrap_xmalloc(size_t size, void *mem_user_data)
+{
+    return xmalloc(size);
+}
+
+static void wrap_xfree(void *ptr, void *mem_user_data)
+{
+    xfree(ptr);
+}
+
+static void *wrap_xcalloc(size_t nmemb, size_t size, void *mem_user_data)
+{
+    return xcalloc(nmemb, size);
+}
+
+static void *wrap_xrealloc(void *ptr, size_t size, void *mem_user_data)
+{
+    return xrealloc(ptr, size);
+}
+
 static ssize_t send_callback(nghttp2_session * session,
 			     const uint8_t *data,
 			     size_t length,
@@ -234,10 +254,17 @@ static VALUE client_init_internals(VALUE self, VALUE cb)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
+    nghttp2_mem mem = {
+	NULL,
+	wrap_xmalloc,
+	wrap_xfree,
+	wrap_xcalloc,
+	wrap_xrealloc
+    };
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
 
-    nghttp2_session_client_new(&session, callbacks, (void *)self);
+    nghttp2_session_client_new3(&session, callbacks, (void *)self, NULL, &mem);
     DATA_PTR(self) = session;
 
     return self;
@@ -247,10 +274,17 @@ static VALUE server_init_internals(VALUE self, VALUE cb)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
+    nghttp2_mem mem = {
+	NULL,
+	wrap_xmalloc,
+	wrap_xfree,
+	wrap_xcalloc,
+	wrap_xrealloc
+    };
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
 
-    nghttp2_session_server_new(&session, callbacks, (void *)self);
+    nghttp2_session_server_new3(&session, callbacks, (void *)self, NULL, &mem);
     DATA_PTR(self) = session;
 
     return self;
