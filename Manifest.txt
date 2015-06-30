@@ -1,7 +1,13 @@
-History.txt
+.autotest
+CHANGELOG.md
 Manifest.txt
-README.txt
+README.md
 Rakefile
-bin/ds9
+ext/ds9/ds9.c
+ext/ds9/ds9.h
+ext/ds9/ds9_frames.c
+ext/ds9/extconf.rb
 lib/ds9.rb
+test/helper.rb
+test/test_client.rb
 test/test_ds9.rb
