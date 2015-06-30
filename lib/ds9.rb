@@ -38,7 +38,10 @@ module DS9
     private
 
     def callbacks
-      Session.private_instance_methods(false).grep(/^on_|event$/)
+      Session.private_instance_methods(false).grep(/^(on_|before)|event$/)
+    end
+
+    def before_frame_send frame
     end
 
     def send_event string

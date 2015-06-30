@@ -28,6 +28,20 @@ static void *wrap_xrealloc(void *ptr, size_t size, void *mem_user_data)
     return xrealloc(ptr, size);
 }
 
+static int before_frame_send_callback(nghttp2_session *session,
+				      const nghttp2_frame *frame,
+				      void *user_data)
+{
+    VALUE self = (VALUE)user_data;
+    VALUE ret;
+
+    ret = rb_funcall(self, rb_intern("before_frame_send"), 1, WrapDS9Frame(frame));
+
+    if (ret == Qfalse) return 1;
+
+    return 0;
+}
+
 static ssize_t send_callback(nghttp2_session * session,
 			     const uint8_t *data,
 			     size_t length,
@@ -533,6 +547,7 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
     nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
     nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
+    nghttp2_session_callbacks_set_before_frame_send_callback(callbacks, before_frame_send_callback);
 
     return TypedData_Wrap_Struct(cDS9Callbacks, &ds9_callbacks_type, callbacks);
 }
