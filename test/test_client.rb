@@ -23,7 +23,7 @@ class TestClient < DS9::TestCase
       ]
     end
 
-    headers, _body = run_loop server, client
+    _, _body = run_loop server, client
     assert_equal body, _body.join
 
     assert_finish server, client
