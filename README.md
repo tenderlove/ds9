@@ -13,7 +13,101 @@ around nghttp2.
 
 ## SYNOPSIS:
 
-  FIX (code sample of usage)
+Here is a full client that supports server pushes:
+
+```ruby
+require 'ds9'
+require 'socket'
+require 'openssl'
+require 'uri'
+
+class MySession < DS9::Client
+  def initialize sock
+    @sock      = sock
+    @complete  = []
+    @in_flight = {}
+    @requests  = []
+    super()
+  end
+
+  def submit_request headers
+    @requests << headers
+    super
+  end
+
+  def on_stream_close id, errcode
+    @complete << [@requests.shift, @in_flight.delete(id)]
+    terminate_session DS9::NO_ERROR if @requests.empty?
+  end
+
+  def on_begin_headers frame
+    @in_flight[frame.stream_id] = [[], []] if frame.headers?
+    @requests << []                        if frame.push_promise?
+  end
+
+  def on_header name, value, frame, flags
+    @in_flight[frame.stream_id].first << [name, value] if frame.headers?
+    @requests.last << [name, value]                    if frame.push_promise?
+  end
+
+  def on_data_chunk_recv id, data, flags
+    @in_flight[id].last << data
+  end
+
+  def send_event string
+    @sock.write_nonblock string
+  end
+
+  def recv_event length
+    case data = @sock.read_nonblock(length, nil, exception: false)
+    when :wait_readable then DS9::ERR_WOULDBLOCK
+    when nil            then DS9::ERR_EOF
+    else
+      data
+    end
+  end
+
+  def run
+    while want_read? || want_write?
+      rd, wr, _ = IO.select([@sock], [@sock])
+      receive
+      send
+      yield @complete.pop if @complete.any?
+    end
+  end
+end
+
+uri = URI.parse ARGV[0]
+socket = TCPSocket.new uri.host, uri.port
+socket.setsockopt Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1
+
+ctx               = OpenSSL::SSL::SSLContext.new
+ctx.npn_protocols = [DS9::NGHTTP2_PROTO_VERSION_ID]
+ctx.npn_select_cb = lambda do |protocols|
+  DS9::NGHTTP2_PROTO_VERSION_ID if protocols.include?(DS9::NGHTTP2_PROTO_VERSION_ID)
+end
+
+socket            = OpenSSL::SSL::SSLSocket.new socket, ctx
+socket.hostname = uri.hostname
+socket.connect
+socket.sync_close = true
+
+session = MySession.new socket
+session.submit_settings []
+
+session.submit_request [
+  [':method', 'GET'],
+  [':path', '/'],
+  [':scheme', 'https'],
+  [':authority', [uri.host, uri.port].join(':')],
+  ['accept', '*/*'],
+  ['user-agent', 'test'],
+]
+
+session.run do |req, res|
+  p req => res
+end
+```
 
 ## REQUIREMENTS:
 

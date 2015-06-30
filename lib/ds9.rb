@@ -14,6 +14,11 @@ module DS9
       def settings?; false; end
       def headers?;  false; end
       def data?;     false; end
+      def push_promise?; false; end
+    end
+
+    class PushPromise
+      def push_promise?; true; end
     end
 
     class Data
@@ -38,7 +43,7 @@ module DS9
     private
 
     def callbacks
-      Session.private_instance_methods(false).grep(/^(on_|before)|event$/)
+      CALLBACKS
     end
 
     def before_frame_send frame
@@ -81,5 +86,7 @@ module DS9
 
     def on_frame_not_send frame, reason
     end
+
+    CALLBACKS = private_instance_methods(false).grep(/^(on_|before)|event$/)
   end
 end
