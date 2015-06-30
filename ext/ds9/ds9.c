@@ -552,6 +552,49 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     return TypedData_Wrap_Struct(cDS9Callbacks, &ds9_callbacks_type, callbacks);
 }
 
+static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE headers)
+{
+    nghttp2_session *session;
+    nghttp2_nv *nva, *head;
+    size_t niv, i;
+    int rv;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+
+    Check_Type(headers, T_ARRAY);
+    niv = RARRAY_LEN(headers);
+    nva = xcalloc(niv, sizeof(nghttp2_nv));
+    head = nva;
+
+    for(i = 0; i < niv; i++, head++) {
+	VALUE tuple = rb_ary_entry(headers, (long)i);
+	VALUE name = rb_ary_entry(tuple, 0);
+	VALUE value = rb_ary_entry(tuple, 1);
+
+	head->name = (uint8_t *)StringValuePtr(name);
+	head->namelen = RSTRING_LEN(name);
+
+	head->value = (uint8_t *)StringValuePtr(value);
+	head->valuelen = RSTRING_LEN(value);
+	head->flags = NGHTTP2_NV_FLAG_NONE;
+    }
+
+    rv = nghttp2_submit_push_promise(session, 0, NUM2INT(stream_id), nva, niv, NULL);
+
+    xfree(nva);
+
+    switch(rv) {
+	case NGHTTP2_ERR_NOMEM:
+	case NGHTTP2_ERR_PROTO:
+	case NGHTTP2_ERR_STREAM_ID_NOT_AVAILABLE:
+	case NGHTTP2_ERR_INVALID_ARGUMENT:
+	    rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	    break;
+	default:
+	    return INT2NUM(rv);
+    }
+}
+
 void Init_ds9(void)
 {
     mDS9 = rb_define_module("DS9");
@@ -594,6 +637,7 @@ void Init_ds9(void)
     rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 1);
 
     rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
+    rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
 }
 
 /* vim: set noet sws=4 sw=4: */

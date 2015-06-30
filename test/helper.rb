@@ -104,6 +104,9 @@ module DS9
         super(read, write)
       end
 
+      def before_frame_send frame
+      end
+
       def on_begin_headers frame
         @read_streams[frame.stream_id] = []
       end
@@ -117,11 +120,21 @@ module DS9
         @write_streams.delete id
       end
 
+      def submit_push_promise stream_id, headers, block
+        response = Response.new(self, super(stream_id, headers), [])
+        block.call response
+        @write_streams[response.stream_id] = response
+      end
+
       def on_header name, value, frame, flags
         @read_streams[frame.stream_id] << [name, value]
       end
 
       class Response < Struct.new :stream, :stream_id, :body
+        def push headers, &block
+          stream.submit_push_promise stream_id, headers, block
+        end
+
         def submit_response headers
           stream.submit_response stream_id, headers
         end
