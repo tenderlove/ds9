@@ -263,6 +263,24 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
     return len;
 }
 
+static void copy_list_to_nv(VALUE list, nghttp2_nv * head, size_t niv)
+{
+    size_t i;
+
+    for(i = 0; i < niv; i++, head++) {
+	VALUE tuple = rb_ary_entry(list, (long)i);
+	VALUE name = rb_ary_entry(tuple, 0);
+	VALUE value = rb_ary_entry(tuple, 1);
+
+	head->name = (uint8_t *)StringValuePtr(name);
+	head->namelen = RSTRING_LEN(name);
+
+	head->value = (uint8_t *)StringValuePtr(value);
+	head->valuelen = RSTRING_LEN(value);
+	head->flags = NGHTTP2_NV_FLAG_NONE;
+    }
+}
+
 static VALUE allocate_session(VALUE klass)
 {
     return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
@@ -461,20 +479,8 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
     Check_Type(settings, T_ARRAY);
     niv = RARRAY_LEN(settings);
     nva = xcalloc(niv, sizeof(nghttp2_nv));
-    head = nva;
 
-    for(i = 0; i < niv; i++, head++) {
-	VALUE tuple = rb_ary_entry(settings, (long)i);
-	VALUE name = rb_ary_entry(tuple, 0);
-	VALUE value = rb_ary_entry(tuple, 1);
-
-	head->name = (uint8_t *)StringValuePtr(name);
-	head->namelen = RSTRING_LEN(name);
-
-	head->value = (uint8_t *)StringValuePtr(value);
-	head->valuelen = RSTRING_LEN(value);
-	head->flags = NGHTTP2_NV_FLAG_NONE;
-    }
+    copy_list_to_nv(settings, nva, niv);
 
     rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
 
@@ -507,7 +513,7 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
 static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 {
     nghttp2_session *session;
-    size_t niv, i;
+    size_t niv;
     nghttp2_nv *nva, *head;
     nghttp2_data_provider provider;
     int rv;
@@ -517,20 +523,8 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 
     niv = RARRAY_LEN(headers);
     nva = xcalloc(niv, sizeof(nghttp2_nv));
-    head = nva;
 
-    for(i = 0; i < niv; i++, head++) {
-	VALUE tuple = rb_ary_entry(headers, (long)i);
-	VALUE name = rb_ary_entry(tuple, 0);
-	VALUE value = rb_ary_entry(tuple, 1);
-
-	head->name = (uint8_t *)StringValuePtr(name);
-	head->namelen = RSTRING_LEN(name);
-
-	head->value = (uint8_t *)StringValuePtr(value);
-	head->valuelen = RSTRING_LEN(value);
-	head->flags = NGHTTP2_NV_FLAG_NONE;
-    }
+    copy_list_to_nv(headers, nva, niv);
 
     provider.read_callback = rb_data_read_callback;
 
