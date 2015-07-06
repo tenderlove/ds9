@@ -605,6 +605,13 @@ static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE heade
     }
 }
 
+static VALUE rb_nghttp_version(VALUE klass)
+{
+    nghttp2_info * info = nghttp2_version(0);
+
+    return rb_usascii_str_new2(info->version_str);
+}
+
 void Init_ds9(void)
 {
     mDS9 = rb_define_module("DS9");
@@ -622,6 +629,7 @@ void Init_ds9(void)
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
     rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mDS9, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
+    rb_define_singleton_method(mDS9, "nghttp_version", rb_nghttp_version, 0);
 
     cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cData);
 
