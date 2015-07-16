@@ -506,6 +506,65 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
     return INT2NUM(rv);
 }
 
+static VALUE session_submit_shutdown(VALUE self)
+{
+    int rv;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    rv = nghttp2_submit_shutdown_notice(session);
+
+    if (rv == 0)
+	return Qtrue;
+
+    rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+}
+
+static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
+{
+    int rv;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    rv = nghttp2_submit_goaway(session, NGHTTP2_FLAG_NONE,
+	    NUM2INT(last_stream_id), NUM2INT(err), NULL, 0);
+
+    if (rv == 0)
+	return Qtrue;
+
+    rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+}
+
+static VALUE session_stream_local_closed_p(VALUE self, VALUE streamid)
+{
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    if (nghttp2_session_get_stream_local_close(session, NUM2INT(streamid)) == 1)
+	return Qtrue;
+
+    return Qfalse;
+}
+
+static VALUE session_stream_remote_closed_p(VALUE self, VALUE streamid)
+{
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    if (nghttp2_session_get_stream_remote_close(session, NUM2INT(streamid)) == 1)
+	return Qtrue;
+
+    return Qfalse;
+}
+
 static VALUE session_terminate_session(VALUE self, VALUE err)
 {
     int rv;
@@ -669,12 +728,15 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "want_read?", session_want_read_p, 0);
     rb_define_method(cDS9Session, "submit_settings", session_submit_settings, 1);
     rb_define_method(cDS9Session, "submit_ping", session_submit_ping, 0);
+    rb_define_method(cDS9Session, "submit_goaway", session_submit_goaway, 2);
     rb_define_method(cDS9Session, "send", session_send, 0);
     rb_define_method(cDS9Session, "receive", session_receive, 0);
     rb_define_method(cDS9Session, "mem_receive", session_mem_receive, 1);
     rb_define_method(cDS9Session, "mem_send", session_mem_send, 0);
     rb_define_method(cDS9Session, "outbound_queue_size", session_outbound_queue_size, 0);
     rb_define_method(cDS9Session, "terminate_session", session_terminate_session, 1);
+    rb_define_method(cDS9Session, "stream_local_closed?", session_stream_local_closed_p, 1);
+    rb_define_method(cDS9Session, "stream_remote_closed?", session_stream_remote_closed_p, 1);
 
     rb_define_method(cDS9Session, "submit_request", session_submit_request, 1);
     rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 1);
@@ -683,6 +745,7 @@ void Init_ds9(void)
 
     rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
+    rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
 }
 
 /* vim: set noet sws=4 sw=4: */

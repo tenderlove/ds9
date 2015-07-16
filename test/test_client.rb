@@ -1,11 +1,38 @@
 require 'helper'
 
 class TestClient < DS9::TestCase
-  def test_ping
-    body = 'omglolwut'
-
+  def test_submit_shutdown
     rd, wr, server = make_server { |req, res| }
+    client = make_client rd, wr
 
+    server.submit_shutdown
+    server.send
+    client.receive
+    assert_predicate client.frames.last, :goaway?
+  end
+
+  def test_submit_goaway
+    rd, wr, server = make_server { |req, res| }
+    client = make_client rd, wr
+
+    server.submit_goaway 0, 0
+    server.send
+    client.receive
+    assert_predicate client.frames.last, :goaway?
+  end
+
+  def test_stream_remote_closed?
+    _, _, server = make_server { |req, res| }
+    refute server.stream_remote_closed? 0
+  end
+
+  def test_stream_local_closed?
+    _, _, server = make_server { |req, res| }
+    refute server.stream_local_closed? 0
+  end
+
+  def test_ping
+    rd, wr, server = make_server { |req, res| }
     client = make_client rd, wr
 
     server.submit_ping
