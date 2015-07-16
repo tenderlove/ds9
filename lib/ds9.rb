@@ -15,6 +15,35 @@ module DS9
       def headers?;  false; end
       def data?;     false; end
       def push_promise?; false; end
+      def priority?; false; end
+      def rst_stream?; false; end
+      def ping?; false; end
+      def goaway?; false; end
+      def window_update?; false; end
+      def continuation?; false; end
+    end
+
+    class Continuation
+      def continuation?; true; end
+    end
+    class WindowUpdate
+      def window_update?; true; end
+    end
+
+    class Goaway
+      def goaway?; true; end
+    end
+
+    class Ping
+      def ping?; true; end
+    end
+
+    class Priority
+      def priority?; true; end
+    end
+
+    class RstStream
+      def rst_stream?; true; end
     end
 
     class PushPromise
