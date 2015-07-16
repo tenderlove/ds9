@@ -625,10 +625,19 @@ void Init_ds9(void)
     VALUE mDS9Settings = rb_define_module_under(mDS9, "Settings");
     rb_define_const(mDS9Settings, "MAX_CONCURRENT_STREAMS", INT2NUM(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS));
     rb_define_const(mDS9Settings, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE));
+
     rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
     rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
+    rb_define_const(mDS9, "DEFAULT_WEIGHT", INT2NUM(NGHTTP2_DEFAULT_WEIGHT));
+    rb_define_const(mDS9, "MAX_WEIGHT", INT2NUM(NGHTTP2_MAX_WEIGHT));
+    rb_define_const(mDS9, "MIN_WEIGHT", INT2NUM(NGHTTP2_MIN_WEIGHT));
+    rb_define_const(mDS9, "MAX_WINDOW_SIZE", INT2NUM(NGHTTP2_MAX_WINDOW_SIZE));
     rb_define_const(mDS9, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_WINDOW_SIZE));
+    rb_define_const(mDS9, "INITIAL_CONNECTION_WINDOW_SIZE", INT2NUM(NGHTTP2_INITIAL_CONNECTION_WINDOW_SIZE));
+    rb_define_const(mDS9, "DEFAULT_HEADER_TABLE_SIZE", INT2NUM(NGHTTP2_DEFAULT_HEADER_TABLE_SIZE));
+    rb_define_const(mDS9, "CLIENT_MAGIC", rb_str_new(NGHTTP2_CLIENT_MAGIC, NGHTTP2_CLIENT_MAGIC_LEN));
+
     rb_define_singleton_method(mDS9, "nghttp_version", rb_nghttp_version, 0);
 
     cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cData);
