@@ -7,6 +7,7 @@ VALUE cDS9Client;
 VALUE cDS9Server;
 VALUE cDS9Callbacks;
 VALUE eDS9Exception;
+VALUE mDS9Errors;
 
 #define CheckSelf(ptr) \
     if (NULL == (ptr)) \
@@ -746,6 +747,23 @@ void Init_ds9(void)
     rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
     rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
+
+    mDS9Errors = rb_define_module_under(mDS9, "Errors");
+
+    rb_define_const(mDS9Errors, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
+    rb_define_const(mDS9Errors, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
+    rb_define_const(mDS9Errors, "INTERNAL_ERROR", INT2NUM(NGHTTP2_INTERNAL_ERROR));
+    rb_define_const(mDS9Errors, "FLOW_CONTROL_ERROR", INT2NUM(NGHTTP2_FLOW_CONTROL_ERROR));
+    rb_define_const(mDS9Errors, "SETTINGS_TIMEOUT", INT2NUM(NGHTTP2_SETTINGS_TIMEOUT));
+    rb_define_const(mDS9Errors, "STREAM_CLOSED", INT2NUM(NGHTTP2_STREAM_CLOSED));
+    rb_define_const(mDS9Errors, "FRAME_SIZE_ERROR", INT2NUM(NGHTTP2_FRAME_SIZE_ERROR));
+    rb_define_const(mDS9Errors, "REFUSED_STREAM", INT2NUM(NGHTTP2_REFUSED_STREAM));
+    rb_define_const(mDS9Errors, "CANCEL", INT2NUM(NGHTTP2_CANCEL));
+    rb_define_const(mDS9Errors, "COMPRESSION_ERROR", INT2NUM(NGHTTP2_COMPRESSION_ERROR));
+    rb_define_const(mDS9Errors, "CONNECT_ERROR", INT2NUM(NGHTTP2_CONNECT_ERROR));
+    rb_define_const(mDS9Errors, "ENHANCE_YOUR_CALM", INT2NUM(NGHTTP2_ENHANCE_YOUR_CALM));
+    rb_define_const(mDS9Errors, "INADEQUATE_SECURITY", INT2NUM(NGHTTP2_INADEQUATE_SECURITY));
+    rb_define_const(mDS9Errors, "HTTP_1_1_REQUIRED", INT2NUM(NGHTTP2_HTTP_1_1_REQUIRED));
 }
 
 /* vim: set noet sws=4 sw=4: */
