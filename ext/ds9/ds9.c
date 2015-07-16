@@ -625,6 +625,10 @@ void Init_ds9(void)
     VALUE mDS9Settings = rb_define_module_under(mDS9, "Settings");
     rb_define_const(mDS9Settings, "MAX_CONCURRENT_STREAMS", INT2NUM(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS));
     rb_define_const(mDS9Settings, "INITIAL_WINDOW_SIZE", INT2NUM(NGHTTP2_SETTINGS_INITIAL_WINDOW_SIZE));
+    rb_define_const(mDS9Settings, "HEADER_TABLE_SIZE", INT2NUM(NGHTTP2_SETTINGS_HEADER_TABLE_SIZE));
+    rb_define_const(mDS9Settings, "ENABLE_PUSH", INT2NUM(NGHTTP2_SETTINGS_ENABLE_PUSH));
+    rb_define_const(mDS9Settings, "MAX_FRAME_SIZE", INT2NUM(NGHTTP2_SETTINGS_MAX_FRAME_SIZE));
+    rb_define_const(mDS9Settings, "MAX_HEADER_LIST_SIZE", INT2NUM(NGHTTP2_SETTINGS_MAX_HEADER_LIST_SIZE));
 
     rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
