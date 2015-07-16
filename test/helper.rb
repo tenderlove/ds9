@@ -15,7 +15,7 @@ module DS9
     def make_client rd, wr, settings = []
       client = Client.new rd, wr, []
       client.submit_settings settings
-      yield client
+      yield client if block_given?
       client
     end
 
@@ -69,12 +69,17 @@ module DS9
     class Client < DS9::Client
       include IOEvents
 
-      attr_reader :responses, :response_queue
+      attr_reader :responses, :response_queue, :frames
 
       def initialize read, write, response_queue
         @response_streams = {}
         @responses        = response_queue
+        @frames           = []
         super(read, write)
+      end
+
+      def on_frame_recv frame
+        @frames << frame
       end
 
       def on_begin_headers frame

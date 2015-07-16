@@ -354,6 +354,19 @@ static VALUE session_want_read_p(VALUE self)
     return Qtrue;
 }
 
+static VALUE session_submit_ping(VALUE self)
+{
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    if (nghttp2_submit_ping(session, NGHTTP2_FLAG_NONE, NULL) == 0)
+	return Qtrue;
+
+    return Qfalse;
+}
+
 static VALUE session_submit_settings(VALUE self, VALUE settings)
 {
     size_t niv, i;
@@ -655,6 +668,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "want_write?", session_want_write_p, 0);
     rb_define_method(cDS9Session, "want_read?", session_want_read_p, 0);
     rb_define_method(cDS9Session, "submit_settings", session_submit_settings, 1);
+    rb_define_method(cDS9Session, "submit_ping", session_submit_ping, 0);
     rb_define_method(cDS9Session, "send", session_send, 0);
     rb_define_method(cDS9Session, "receive", session_receive, 0);
     rb_define_method(cDS9Session, "mem_receive", session_mem_receive, 1);

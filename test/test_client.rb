@@ -1,6 +1,19 @@
 require 'helper'
 
 class TestClient < DS9::TestCase
+  def test_ping
+    body = 'omglolwut'
+
+    rd, wr, server = make_server { |req, res| }
+
+    client = make_client rd, wr
+
+    server.submit_ping
+    server.send
+    client.receive
+    assert_predicate client.frames.last, :ping?
+  end
+
   def test_push
     body = 'omglolwut'
 
