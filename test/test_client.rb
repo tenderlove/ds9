@@ -1,6 +1,17 @@
 require 'helper'
 
 class TestClient < DS9::TestCase
+  def test_blow_up
+    rd, wr, server = make_server { |req, res| }
+    client = make_client rd, wr
+    wr.close
+
+    ex = assert_raises(DS9::Exception) do
+      server.receive
+    end
+    assert ex.code
+  end
+
   def test_submit_shutdown
     rd, wr, server = make_server { |req, res| }
     client = make_client rd, wr

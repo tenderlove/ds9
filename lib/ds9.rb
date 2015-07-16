@@ -118,4 +118,17 @@ module DS9
 
     CALLBACKS = private_instance_methods(false).grep(/^(on_|before)|event$/)
   end
+
+  class Exception < StandardError
+    def self.abort code
+      raise new(to_string(code), code)
+    end
+
+    attr_reader :code
+
+    def initialize str, code
+      @code = code
+      super(str)
+    end
+  end
 end

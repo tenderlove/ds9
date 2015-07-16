@@ -7,11 +7,11 @@ VALUE cDS9Client;
 VALUE cDS9Server;
 VALUE cDS9Callbacks;
 VALUE eDS9Exception;
-VALUE mDS9Errors;
+VALUE eDS9UninitializedException;
 
 #define CheckSelf(ptr) \
     if (NULL == (ptr)) \
-      rb_raise(eDS9Exception, "not initialized, call `super` from `initialize`");
+      rb_raise(eDS9UninitializedException, "not initialized, call `super` from `initialize`");
 
 static void * wrap_xmalloc(size_t size, void *mem_user_data)
 {
@@ -31,6 +31,10 @@ static void *wrap_xcalloc(size_t nmemb, size_t size, void *mem_user_data)
 static void *wrap_xrealloc(void *ptr, size_t size, void *mem_user_data)
 {
     return xrealloc(ptr, size);
+}
+
+static VALUE explode(int code) {
+    return rb_funcall(eDS9Exception, rb_intern("abort"), 1, INT2NUM(code));
 }
 
 static int before_frame_send_callback(nghttp2_session *session,
@@ -393,7 +397,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     xfree(iv);
 
     if (0 != rv) {
-	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return self;
@@ -409,7 +413,7 @@ static VALUE session_send(VALUE self)
 
     rv = nghttp2_session_send(session);
     if (rv != 0) {
-	rb_raise(eDS9Exception, "Error SEESSION SEND: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return self;
@@ -426,7 +430,7 @@ static VALUE session_receive(VALUE self)
     assert(session);
     rv = nghttp2_session_recv(session);
     if (rv != 0) {
-	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return self;
@@ -442,7 +446,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
-	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return INT2NUM(rv);
@@ -464,7 +468,7 @@ static VALUE session_mem_send(VALUE self)
     }
 
     if (rv < 0) {
-	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return rb_str_new((const char *)data, rv);
@@ -501,7 +505,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
     xfree(nva);
 
     if (rv < 0) {
-	rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return INT2NUM(rv);
@@ -520,7 +524,7 @@ static VALUE session_submit_shutdown(VALUE self)
     if (rv == 0)
 	return Qtrue;
 
-    rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+    return explode(rv);
 }
 
 static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
@@ -537,7 +541,7 @@ static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
     if (rv == 0)
 	return Qtrue;
 
-    rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+    return explode(rv);
 }
 
 static VALUE session_stream_local_closed_p(VALUE self, VALUE streamid)
@@ -577,7 +581,7 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     rv = nghttp2_session_terminate_session(session, NUM2INT(err));
 
     if (rv != 0) {
-	rb_raise(rb_eStandardError, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return self;
@@ -606,7 +610,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     xfree(nva);
 
     if (0 != rv) {
-	rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	explode(rv);
     }
 
     return self;
@@ -671,7 +675,7 @@ static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE heade
 	case NGHTTP2_ERR_PROTO:
 	case NGHTTP2_ERR_STREAM_ID_NOT_AVAILABLE:
 	case NGHTTP2_ERR_INVALID_ARGUMENT:
-	    rb_raise(eDS9Exception, "Error: %s", nghttp2_strerror(rv));
+	    return explode(rv);
 	    break;
 	default:
 	    return INT2NUM(rv);
@@ -685,6 +689,11 @@ static VALUE rb_nghttp_version(VALUE klass)
     return rb_usascii_str_new2(info->version_str);
 }
 
+static VALUE errors_to_string(VALUE mod, VALUE err)
+{
+    return rb_usascii_str_new2(nghttp2_strerror(NUM2INT(err)));
+}
+
 void Init_ds9(void)
 {
     mDS9 = rb_define_module("DS9");
@@ -694,6 +703,7 @@ void Init_ds9(void)
     rb_define_const(mDS9, "PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
 
     eDS9Exception = rb_define_class_under(mDS9, "Exception", rb_eStandardError);
+    eDS9UninitializedException = rb_define_class_under(mDS9, "UninitializedException", rb_eStandardError);
 
     VALUE mDS9Settings = rb_define_module_under(mDS9, "Settings");
     rb_define_const(mDS9Settings, "MAX_CONCURRENT_STREAMS", INT2NUM(NGHTTP2_SETTINGS_MAX_CONCURRENT_STREAMS));
@@ -748,22 +758,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
     rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
 
-    mDS9Errors = rb_define_module_under(mDS9, "Errors");
-
-    rb_define_const(mDS9Errors, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
-    rb_define_const(mDS9Errors, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
-    rb_define_const(mDS9Errors, "INTERNAL_ERROR", INT2NUM(NGHTTP2_INTERNAL_ERROR));
-    rb_define_const(mDS9Errors, "FLOW_CONTROL_ERROR", INT2NUM(NGHTTP2_FLOW_CONTROL_ERROR));
-    rb_define_const(mDS9Errors, "SETTINGS_TIMEOUT", INT2NUM(NGHTTP2_SETTINGS_TIMEOUT));
-    rb_define_const(mDS9Errors, "STREAM_CLOSED", INT2NUM(NGHTTP2_STREAM_CLOSED));
-    rb_define_const(mDS9Errors, "FRAME_SIZE_ERROR", INT2NUM(NGHTTP2_FRAME_SIZE_ERROR));
-    rb_define_const(mDS9Errors, "REFUSED_STREAM", INT2NUM(NGHTTP2_REFUSED_STREAM));
-    rb_define_const(mDS9Errors, "CANCEL", INT2NUM(NGHTTP2_CANCEL));
-    rb_define_const(mDS9Errors, "COMPRESSION_ERROR", INT2NUM(NGHTTP2_COMPRESSION_ERROR));
-    rb_define_const(mDS9Errors, "CONNECT_ERROR", INT2NUM(NGHTTP2_CONNECT_ERROR));
-    rb_define_const(mDS9Errors, "ENHANCE_YOUR_CALM", INT2NUM(NGHTTP2_ENHANCE_YOUR_CALM));
-    rb_define_const(mDS9Errors, "INADEQUATE_SECURITY", INT2NUM(NGHTTP2_INADEQUATE_SECURITY));
-    rb_define_const(mDS9Errors, "HTTP_1_1_REQUIRED", INT2NUM(NGHTTP2_HTTP_1_1_REQUIRED));
+    rb_define_singleton_method(eDS9Exception, "to_string", errors_to_string, 1);
 }
 
 /* vim: set noet sws=4 sw=4: */

@@ -111,6 +111,21 @@ void Init_ds9_frames(VALUE mDS9)
     rb_define_method(cDS9FramesFrame, "type", frame_type, 0);
     rb_define_method(cDS9FramesFrame, "flags", frame_flags, 0);
     rb_define_method(cDS9FramesFrame, "header", frame_header, 0);
+
+    rb_define_const(cDS9FramesGoaway, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
+    rb_define_const(cDS9FramesGoaway, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
+    rb_define_const(cDS9FramesGoaway, "INTERNAL_ERROR", INT2NUM(NGHTTP2_INTERNAL_ERROR));
+    rb_define_const(cDS9FramesGoaway, "FLOW_CONTROL_ERROR", INT2NUM(NGHTTP2_FLOW_CONTROL_ERROR));
+    rb_define_const(cDS9FramesGoaway, "SETTINGS_TIMEOUT", INT2NUM(NGHTTP2_SETTINGS_TIMEOUT));
+    rb_define_const(cDS9FramesGoaway, "STREAM_CLOSED", INT2NUM(NGHTTP2_STREAM_CLOSED));
+    rb_define_const(cDS9FramesGoaway, "FRAME_SIZE_ERROR", INT2NUM(NGHTTP2_FRAME_SIZE_ERROR));
+    rb_define_const(cDS9FramesGoaway, "REFUSED_STREAM", INT2NUM(NGHTTP2_REFUSED_STREAM));
+    rb_define_const(cDS9FramesGoaway, "CANCEL", INT2NUM(NGHTTP2_CANCEL));
+    rb_define_const(cDS9FramesGoaway, "COMPRESSION_ERROR", INT2NUM(NGHTTP2_COMPRESSION_ERROR));
+    rb_define_const(cDS9FramesGoaway, "CONNECT_ERROR", INT2NUM(NGHTTP2_CONNECT_ERROR));
+    rb_define_const(cDS9FramesGoaway, "ENHANCE_YOUR_CALM", INT2NUM(NGHTTP2_ENHANCE_YOUR_CALM));
+    rb_define_const(cDS9FramesGoaway, "INADEQUATE_SECURITY", INT2NUM(NGHTTP2_INADEQUATE_SECURITY));
+    rb_define_const(cDS9FramesGoaway, "HTTP_1_1_REQUIRED", INT2NUM(NGHTTP2_HTTP_1_1_REQUIRED));
 }
 
 /* vim: set noet sws=4 sw=4: */
