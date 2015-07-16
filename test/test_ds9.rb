@@ -2,7 +2,7 @@ require 'helper'
 
 class TestDS9 < Minitest::Test
   def test_sanity
-    assert DS9::NGHTTP2_PROTO_VERSION_ID
+    assert DS9::PROTO_VERSION_ID
   end
 
   def test_session_allocation

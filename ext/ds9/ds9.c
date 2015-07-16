@@ -618,7 +618,7 @@ void Init_ds9(void)
 
     Init_ds9_frames(mDS9);
 
-    rb_define_const(mDS9, "NGHTTP2_PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
+    rb_define_const(mDS9, "PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
 
     eDS9Exception = rb_define_class_under(mDS9, "Exception", rb_eStandardError);
 

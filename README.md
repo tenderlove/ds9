@@ -82,9 +82,9 @@ socket = TCPSocket.new uri.host, uri.port
 socket.setsockopt Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1
 
 ctx               = OpenSSL::SSL::SSLContext.new
-ctx.npn_protocols = [DS9::NGHTTP2_PROTO_VERSION_ID]
+ctx.npn_protocols = [DS9::PROTO_VERSION_ID]
 ctx.npn_select_cb = lambda do |protocols|
-  DS9::NGHTTP2_PROTO_VERSION_ID if protocols.include?(DS9::NGHTTP2_PROTO_VERSION_ID)
+  DS9::PROTO_VERSION_ID if protocols.include?(DS9::PROTO_VERSION_ID)
 end
 
 socket            = OpenSSL::SSL::SSLSocket.new socket, ctx
