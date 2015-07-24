@@ -1,6 +1,14 @@
 require 'helper'
 
 class TestClient < DS9::TestCase
+  def test_outbound_queue_size
+    _, _, server = make_server
+
+    assert_equal 1, server.outbound_queue_size
+    server.submit_shutdown
+    assert_operator server.outbound_queue_size, :>, 1
+  end
+
   def test_blow_up
     rd, wr, server = make_server { |req, res| }
     client = make_client rd, wr
