@@ -72,8 +72,7 @@ class TestClient < DS9::TestCase
   end
 
   def test_ping
-    rd, wr, server = make_server { |req, res| }
-    client = make_client rd, wr
+    server, client = pipe { |req, res| }
 
     server.submit_ping
     server.send
