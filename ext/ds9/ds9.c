@@ -547,12 +547,24 @@ static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
 static VALUE session_stream_local_closed_p(VALUE self, VALUE streamid)
 {
     nghttp2_session *session;
+    int stream_id;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    if (nghttp2_session_get_stream_local_close(session, NUM2INT(streamid)) == 1)
-	return Qtrue;
+    stream_id = NUM2INT(streamid);
+
+    switch(nghttp2_session_get_stream_local_close(session, stream_id))
+    {
+	case 1:
+	    return Qtrue;
+	    break;
+	case 0:
+	    return Qfalse;
+	    break;
+	default:
+	    rb_raise(rb_eStandardError, "no such stream: %d", stream_id);
+    }
 
     return Qfalse;
 }
@@ -560,12 +572,24 @@ static VALUE session_stream_local_closed_p(VALUE self, VALUE streamid)
 static VALUE session_stream_remote_closed_p(VALUE self, VALUE streamid)
 {
     nghttp2_session *session;
+    int stream_id;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    if (nghttp2_session_get_stream_remote_close(session, NUM2INT(streamid)) == 1)
-	return Qtrue;
+    stream_id = NUM2INT(streamid);
+
+    switch(nghttp2_session_get_stream_remote_close(session, stream_id))
+    {
+	case 1:
+	    return Qtrue;
+	    break;
+	case 0:
+	    return Qfalse;
+	    break;
+	default:
+	    rb_raise(rb_eStandardError, "no such stream: %d", stream_id);
+    }
 
     return Qfalse;
 }

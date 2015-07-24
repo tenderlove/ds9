@@ -102,8 +102,8 @@ module DS9
     class Server < DS9::Server
       include IOEvents
 
-      def initialize read, write, rack_app
-        @rack_app      = rack_app
+      def initialize read, write, app
+        @app           = app
         @read_streams  = {}
         @write_streams = {}
         super(read, write)
@@ -125,9 +125,10 @@ module DS9
         @write_streams.delete id
       end
 
-      def submit_push_promise stream_id, headers, block
+      def submit_push_promise stream_id, headers
         response = Response.new(self, super(stream_id, headers), [])
-        block.call response
+        request = Request.new(self, stream_id, Hash[headers])
+        @app.call request, response
         @write_streams[response.stream_id] = response
       end
 
@@ -135,9 +136,15 @@ module DS9
         @read_streams[frame.stream_id] << [name, value]
       end
 
+      class Request < Struct.new :stream, :stream_id, :headers
+        def path
+          headers[':path']
+        end
+      end
+
       class Response < Struct.new :stream, :stream_id, :body
-        def push headers, &block
-          stream.submit_push_promise stream_id, headers, block
+        def push headers
+          stream.submit_push_promise stream_id, headers
         end
 
         def submit_response headers
@@ -156,8 +163,9 @@ module DS9
         req_headers = @read_streams[frame.stream_id]
 
         response = Response.new(self, frame.stream_id, [])
+        request = Request.new(self, frame.stream_id, Hash[req_headers])
 
-        @rack_app.call req_headers, response
+        @app.call request, response
 
         @write_streams[frame.stream_id] = response
       end

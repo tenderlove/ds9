@@ -41,13 +41,26 @@ class TestClient < DS9::TestCase
   end
 
   def test_stream_remote_closed?
-    _, _, server = make_server { |req, res| }
-    refute server.stream_remote_closed? 0
-  end
-
-  def test_stream_local_closed?
-    _, _, server = make_server { |req, res| }
-    refute server.stream_local_closed? 0
+    rd, wr, server = make_server { |req, res|
+      refute req.stream.stream_remote_closed? req.stream_id
+      refute req.stream.stream_local_closed? req.stream_id
+      res.submit_response [[":status", '200'],
+                           ["server", 'test server'],
+                           ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
+                           ["X-Whatever", "blah"]]
+      res.finish 'omglol'
+    }
+    client = make_client(rd, wr) do |session|
+      session.submit_request [
+        [':method', 'GET'],
+        [':path', '/'],
+        [':scheme', 'https'],
+        [':authority', ['localhost', '8080'].join(':')],
+        ['accept', '*/*'],
+        ['user-agent', 'test'],
+      ]
+    end
+    _, _body = run_loop server, client
   end
 
   def test_ping
@@ -64,21 +77,25 @@ class TestClient < DS9::TestCase
     body = 'omglolwut'
 
     rd, wr, server = make_server do |req, res|
-      res.push([[':method', 'GET'],
-                [':path', '/omglol'],
-                [':scheme', 'http'],
-                [':authority', 'localhost:8080']]) do |stream|
-                  stream.submit_response [[":status", '200'],
-                                       ["server", 'test server'],
-                                       ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
-                                       ["X-Whatever", "blah"]]
-                  stream.finish 'lololol'
-                end
+      case req.path
+      when '/'
+        res.push([[':method', 'GET'],
+                  [':path', '/omglol'],
+                  [':scheme', 'http'],
+                  [':authority', 'localhost:8080']])
 
-      res.submit_response [[":status", '200'],
-                           ["server", 'test server'],
-                           ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
-                           ["X-Whatever", "blah"]]
+        res.submit_response [[":status", '200'],
+                             ["server", 'test server'],
+                             ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
+                             ["X-Whatever", "blah"]]
+      when '/omglol'
+        res.submit_response [[":status", '200'],
+                             ["server", 'test server'],
+                             ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
+                             ["X-Whatever", "blah"]]
+        res.finish 'lololol'
+      end
+
       res.finish body
     end
 
