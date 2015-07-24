@@ -2,7 +2,7 @@ require 'helper'
 
 class TestClient < DS9::TestCase
   def test_outbound_queue_size
-    _, _, server = make_server
+    server ,= pipe { |req, res| }
 
     assert_equal 1, server.outbound_queue_size
     server.submit_shutdown
@@ -10,9 +10,8 @@ class TestClient < DS9::TestCase
   end
 
   def test_blow_up
-    rd, wr, server = make_server { |req, res| }
-    client = make_client rd, wr
-    wr.close
+    server, client = pipe { |req, res| }
+    client.writer.close
 
     ex = assert_raises(DS9::Exception) do
       server.receive
@@ -21,8 +20,7 @@ class TestClient < DS9::TestCase
   end
 
   def test_submit_shutdown
-    rd, wr, server = make_server { |req, res| }
-    client = make_client rd, wr
+    server, client = pipe { |req, res| }
 
     server.submit_shutdown
     server.send
@@ -31,9 +29,7 @@ class TestClient < DS9::TestCase
   end
 
   def test_submit_goaway
-    rd, wr, server = make_server { |req, res| }
-    client = make_client rd, wr
-
+    server, client = pipe { |req, res| }
     server.submit_goaway 0, 0
     server.send
     client.receive
