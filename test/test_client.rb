@@ -37,7 +37,7 @@ class TestClient < DS9::TestCase
   end
 
   def test_stream_remote_closed?
-    rd, wr, server = make_server { |req, res|
+    server, client = pipe do |req, res|
       refute req.stream.stream_remote_closed? req.stream_id
       refute req.stream.stream_local_closed? req.stream_id
       res.submit_response [[":status", '200'],
@@ -45,8 +45,11 @@ class TestClient < DS9::TestCase
                            ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
                            ["X-Whatever", "blah"]]
       res.finish 'omglol'
-    }
-    client = make_client(rd, wr)
+    end
+
+    s = Thread.new { server.run }
+    c = Thread.new { client.run }
+
     client.submit_request [
       [':method', 'GET'],
       [':path', '/'],
@@ -55,7 +58,17 @@ class TestClient < DS9::TestCase
       ['accept', '*/*'],
       ['user-agent', 'test'],
     ]
-    _, _body = run_loop server, client
+
+    responses = []
+    while response = client.responses.pop
+      responses << response
+      if responses.length == 1
+        client.terminate_session DS9::NO_ERROR
+      end
+    end
+
+    s.join
+    c.join
   end
 
   def test_ping
