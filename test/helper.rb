@@ -1,27 +1,50 @@
 require 'minitest/autorun'
 require 'ds9'
+require 'io/wait'
+require 'thread'
+require 'stringio'
+
+Thread.abort_on_exception = true
+
+trap("INFO") {
+  Thread.list.each do |k|
+    puts "#" * 90
+    puts k.backtrace
+    puts "#" * 90
+  end
+}
 
 module DS9
   class TestCase < Minitest::Test
-    def make_server settings = [], &block
+    def make_server &block
       rd1, wr1 = IO.pipe
       rd2, wr2 = IO.pipe
 
       server = Server.new rd1, wr2, block
-      server.submit_settings settings
+      server.submit_settings [
+        [DS9::Settings::MAX_CONCURRENT_STREAMS, 100],
+      ]
       [rd2, wr1, server]
     end
 
-    def make_client rd, wr, settings = []
-      client = Client.new rd, wr, []
-      client.submit_settings settings
-      yield client if block_given?
+    def make_client rd, wr
+      client = Client.new rd, wr, Queue.new
+      client.submit_settings [
+        [DS9::Settings::MAX_CONCURRENT_STREAMS, 100],
+        [DS9::Settings::INITIAL_WINDOW_SIZE, 65535],
+      ]
       client
+    end
+
+    def pipe &block
+      rd, wr, server = make_server(&block)
+      client = make_client rd, wr
+      [server, client]
     end
 
     def run_loop server, client
       while server.want_read? || server.want_write?
-        break client.responses.shift if client.responses.any?
+        break client.responses.shift if client.responses.length > 0
 
         client.send
         client.receive
@@ -63,11 +86,40 @@ module DS9
         else
           data
         end
+      rescue IOError
+        DS9::ERR_EOF
+      end
+
+      def run
+        while want_read? || want_write?
+          if want_write?
+            @writer.wait_writable 0.1
+            send
+          end
+
+          if want_read?
+            @reader.wait_readable 0.1
+            receive
+          end
+        end
       end
     end
 
     class Client < DS9::Client
       include IOEvents
+
+      class Response
+        attr_reader :stream_id, :body
+
+        def initialize stream_id
+          @stream_id = stream_id
+          @headers   = {}
+          @body      = StringIO.new
+        end
+
+        def [] k; @headers[k]; end
+        def []= k, v; @headers[k] = v; end
+      end
 
       attr_reader :responses, :response_queue, :frames
 
@@ -83,11 +135,11 @@ module DS9
       end
 
       def on_begin_headers frame
-        @response_streams[frame.stream_id] = [[], []]
+        @response_streams[frame.stream_id] = Response.new(frame.stream_id)
       end
 
       def on_header name, value, frame, flags
-        @response_streams[frame.stream_id].first << [name, value]
+        @response_streams[frame.stream_id][name] = value
       end
 
       def on_stream_close id, err
@@ -95,7 +147,12 @@ module DS9
       end
 
       def on_data_chunk_recv stream_id, data, flags
-        @response_streams[stream_id].last << data
+        @response_streams[stream_id].body << data
+      end
+
+      def terminate_session err
+        super
+        @responses << nil
       end
     end
 
@@ -169,6 +226,7 @@ module DS9
 
         @write_streams[frame.stream_id] = response
       end
+
     end
   end
 end

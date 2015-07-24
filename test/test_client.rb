@@ -50,16 +50,15 @@ class TestClient < DS9::TestCase
                            ["X-Whatever", "blah"]]
       res.finish 'omglol'
     }
-    client = make_client(rd, wr) do |session|
-      session.submit_request [
-        [':method', 'GET'],
-        [':path', '/'],
-        [':scheme', 'https'],
-        [':authority', ['localhost', '8080'].join(':')],
-        ['accept', '*/*'],
-        ['user-agent', 'test'],
-      ]
-    end
+    client = make_client(rd, wr)
+    client.submit_request [
+      [':method', 'GET'],
+      [':path', '/'],
+      [':scheme', 'https'],
+      [':authority', ['localhost', '8080'].join(':')],
+      ['accept', '*/*'],
+      ['user-agent', 'test'],
+    ]
     _, _body = run_loop server, client
   end
 
@@ -76,7 +75,7 @@ class TestClient < DS9::TestCase
   def test_push
     body = 'omglolwut'
 
-    rd, wr, server = make_server do |req, res|
+    server, client = pipe do |req, res|
       case req.path
       when '/'
         res.push([[':method', 'GET'],
@@ -99,30 +98,35 @@ class TestClient < DS9::TestCase
       res.finish body
     end
 
-    client = make_client(rd, wr) do |session|
-      session.submit_request [
-        [':method', 'GET'],
-        [':path', '/'],
-        [':scheme', 'https'],
-        [':authority', ['localhost', '8080'].join(':')],
-        ['accept', '*/*'],
-        ['user-agent', 'test'],
-      ]
+    s = Thread.new { server.run }
+    c = Thread.new { client.run }
+
+    client.submit_request [
+      [':method', 'GET'],
+      [':path', '/'],
+      [':scheme', 'https'],
+      [':authority', ['localhost', '8080'].join(':')],
+      ['accept', '*/*'],
+      ['user-agent', 'test'],
+    ]
+
+    responses = []
+    while response = client.responses.pop
+      responses << response
+      if responses.length == 2
+        client.terminate_session DS9::NO_ERROR
+      end
     end
 
-    _, _body = run_loop server, client
-    assert_equal body, _body.join
-
-    _, _body = run_loop server, client
-    assert_equal 'lololol', _body.join
-
-    assert_finish server, client
+    s.join
+    c.join
+    assert_equal ["omglolwut", "lololol"], responses.map(&:body).map(&:string)
   end
 
   def test_request
     body = 'omglolwut'
 
-    rd, wr, server = make_server do |req, res|
+    server, client = pipe do |req, res|
       res.submit_response [[":status", '200'],
                            ["server", 'test server'],
                            ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
@@ -130,20 +134,28 @@ class TestClient < DS9::TestCase
       res.finish body
     end
 
-    client = make_client(rd, wr) do |session|
-      session.submit_request [
-        [':method', 'GET'],
-        [':path', '/'],
-        [':scheme', 'https'],
-        [':authority', ['localhost', '8080'].join(':')],
-        ['accept', '*/*'],
-        ['user-agent', 'test'],
-      ]
+    client.submit_request [
+      [':method', 'GET'],
+      [':path', '/'],
+      [':scheme', 'https'],
+      [':authority', ['localhost', '8080'].join(':')],
+      ['accept', '*/*'],
+      ['user-agent', 'test'],
+    ]
+
+    s = Thread.new { server.run }
+    c = Thread.new { client.run }
+
+    responses = []
+    while response = client.responses.pop
+      responses << response
+      if responses.length == 1
+        client.terminate_session DS9::NO_ERROR
+      end
     end
 
-    _, _body = run_loop server, client
-    assert_equal body, _body.join
-
-    assert_finish server, client
+    s.join
+    c.join
+    assert_equal ["omglolwut"], responses.map(&:body).map(&:string)
   end
 end
