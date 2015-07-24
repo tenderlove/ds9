@@ -16,7 +16,7 @@ trap("INFO") {
 
 module DS9
   class TestCase < Minitest::Test
-    def make_server &block
+    def pipe &block
       rd1, wr1 = IO.pipe
       rd2, wr2 = IO.pipe
 
@@ -24,44 +24,13 @@ module DS9
       server.submit_settings [
         [DS9::Settings::MAX_CONCURRENT_STREAMS, 100],
       ]
-      [rd2, wr1, server]
-    end
 
-    def make_client rd, wr
-      client = Client.new rd, wr, Queue.new
+      client = Client.new rd2, wr1, Queue.new
       client.submit_settings [
         [DS9::Settings::MAX_CONCURRENT_STREAMS, 100],
         [DS9::Settings::INITIAL_WINDOW_SIZE, 65535],
       ]
-      client
-    end
-
-    def pipe &block
-      rd, wr, server = make_server(&block)
-      client = make_client rd, wr
       [server, client]
-    end
-
-    def run_loop server, client
-      while server.want_read? || server.want_write?
-        break client.responses.shift if client.responses.length > 0
-
-        client.send
-        client.receive
-        server.send
-        server.receive
-      end
-    end
-
-    def assert_finish server, client
-      client.terminate_session DS9::NO_ERROR
-
-      while server.want_read? || server.want_write?
-        client.send
-        client.receive
-        server.send
-        server.receive
-      end
     end
 
     module IOEvents
