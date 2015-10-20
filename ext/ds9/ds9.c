@@ -9,6 +9,20 @@ VALUE cDS9Callbacks;
 VALUE eDS9Exception;
 VALUE eDS9UninitializedException;
 
+ID id_on_header,
+   id_on_begin_headers,
+   id_on_frame_not_send,
+   id_on_begin_frame,
+   id_on_invalid_frame_recv,
+   id_send_event,
+   id_recv_event,
+   id_on_frame_send,
+   id_on_frame_recv,
+   id_on_stream_close,
+   id_on_data_chunk_recv,
+   id_on_data_source_read,
+   id_before_frame_send;
+
 #define CheckSelf(ptr) \
     if (NULL == (ptr)) \
       rb_raise(eDS9UninitializedException, "not initialized, call `super` from `initialize`");
@@ -44,7 +58,7 @@ static int before_frame_send_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("before_frame_send"), 1, WrapDS9Frame(frame));
+    ret = rb_funcall(self, id_before_frame_send, 1, WrapDS9Frame(frame));
 
     if (ret == Qfalse) return 1;
 
@@ -59,7 +73,7 @@ static ssize_t send_callback(nghttp2_session * session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("send_event"), 1, rb_str_new((const char *)data, length));
+    ret = rb_funcall(self, id_send_event, 1, rb_str_new((const char *)data, length));
 
     return NUM2INT(ret);
 }
@@ -71,7 +85,7 @@ static int on_frame_recv_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_recv"), 1, WrapDS9Frame(frame));
+    ret = rb_funcall(self, id_on_frame_recv, 1, WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
 	return 1;
@@ -87,7 +101,7 @@ static int on_stream_close_callback(nghttp2_session *session,
 {
     VALUE self = (VALUE)user_data;
 
-    VALUE ret = rb_funcall(self, rb_intern("on_stream_close"), 2, INT2NUM(stream_id), INT2NUM(error_code));
+    VALUE ret = rb_funcall(self, id_on_stream_close, 2, INT2NUM(stream_id), INT2NUM(error_code));
 
     if (ret == Qfalse) {
 	return 1;
@@ -104,7 +118,7 @@ static int on_header_callback(nghttp2_session *session,
 {
     VALUE self = (VALUE)user_data;
 
-    VALUE ret = rb_funcall(self, rb_intern("on_header"), 4,
+    VALUE ret = rb_funcall(self, id_on_header, 4,
 	    rb_usascii_str_new((const char *)name, namelen),
 	    rb_usascii_str_new((const char *)value, valuelen),
 	    WrapDS9Frame(frame),
@@ -123,7 +137,7 @@ static int on_begin_headers_callback(nghttp2_session *session,
 {
     VALUE self = (VALUE)user_data;
 
-    VALUE ret = rb_funcall(self, rb_intern("on_begin_headers"), 1,
+    VALUE ret = rb_funcall(self, id_on_begin_headers, 1,
 	    WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
@@ -141,7 +155,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
     VALUE ret;
     ssize_t len;
 
-    ret = rb_funcall(self, rb_intern("recv_event"), 1, INT2NUM(length));
+    ret = rb_funcall(self, id_recv_event, 1, INT2NUM(length));
 
     if (FIXNUM_P(ret)) {
 	return NUM2INT(ret);
@@ -162,7 +176,7 @@ static int on_begin_frame_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_begin_frame"), 1, WrapDS9FrameHeader(hd));
+    ret = rb_funcall(self, id_on_begin_frame, 1, WrapDS9FrameHeader(hd));
 
     if (ret == Qfalse) {
 	return 1;
@@ -180,7 +194,7 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_data_chunk_recv"), 3,
+    ret = rb_funcall(self, id_on_data_chunk_recv, 3,
 	    INT2NUM(stream_id),
 	    rb_str_new((const char *)data, len),
 	    INT2NUM(flags));
@@ -199,7 +213,7 @@ static int on_invalid_frame_recv_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_invalid_frame_recv"), 2,
+    ret = rb_funcall(self, id_on_invalid_frame_recv, 2,
 	    WrapDS9Frame(frame),
 	    INT2NUM(lib_error_code));
 
@@ -217,7 +231,7 @@ static int on_frame_send_callback(nghttp2_session *session,
     VALUE self = (VALUE)user_data;
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_send"), 1, WrapDS9Frame(frame));
+    ret = rb_funcall(self, id_on_frame_send, 1, WrapDS9Frame(frame));
 
     if (ret == Qfalse) {
 	return 1;
@@ -235,7 +249,7 @@ static int on_frame_not_send_callback(nghttp2_session *session,
     VALUE reason = rb_str_new2(nghttp2_strerror(lib_error_code));
     VALUE ret;
 
-    ret = rb_funcall(self, rb_intern("on_frame_not_send"), 2, WrapDS9Frame(frame), reason);
+    ret = rb_funcall(self, id_on_frame_not_send, 2, WrapDS9Frame(frame), reason);
 
     if (ret == Qfalse) {
 	return 1;
@@ -253,7 +267,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
     VALUE ret;
     ssize_t len;
 
-    ret = rb_funcall(self, rb_intern("on_data_source_read"), 2, INT2NUM(stream_id),
+    ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
 	    INT2NUM(length));
 
     if (NIL_P(ret)) {
@@ -645,40 +659,40 @@ static VALUE make_callbacks(VALUE self)
     nghttp2_session_callbacks *callbacks;
     nghttp2_session_callbacks_new(&callbacks);
 
-    if (rb_obj_respond_to(self, rb_intern("on_header"), 1))
+    if (rb_obj_respond_to(self, id_on_header, 1))
 	nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_begin_headers"), 1))
+    if (rb_obj_respond_to(self, id_on_begin_headers, 1))
 	nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_frame_not_send"), 1))
+    if (rb_obj_respond_to(self, id_on_frame_not_send, 1))
 	nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_begin_frame"), 1))
+    if (rb_obj_respond_to(self, id_on_begin_frame, 1))
 	nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_invalid_frame_recv"), 1))
+    if (rb_obj_respond_to(self, id_on_invalid_frame_recv, 1))
 	nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("send_event"), 1))
+    if (rb_obj_respond_to(self, id_send_event, 1))
 	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("recv_event"), 1))
+    if (rb_obj_respond_to(self, id_recv_event, 1))
 	nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_frame_send"), 1))
+    if (rb_obj_respond_to(self, id_on_frame_send, 1))
 	nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_frame_recv"), 1))
+    if (rb_obj_respond_to(self, id_on_frame_recv, 1))
 	nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_stream_close"), 1))
+    if (rb_obj_respond_to(self, id_on_stream_close, 1))
 	nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("on_data_chunk_recv"), 1))
+    if (rb_obj_respond_to(self, id_on_data_chunk_recv, 1))
 	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
 
-    if (rb_obj_respond_to(self, rb_intern("before_frame_send"), 1))
+    if (rb_obj_respond_to(self, id_before_frame_send, 1))
 	nghttp2_session_callbacks_set_before_frame_send_callback(callbacks, before_frame_send_callback);
 
     return TypedData_Wrap_Struct(cDS9Callbacks, &ds9_callbacks_type, callbacks);
@@ -805,6 +819,20 @@ void Init_ds9(void)
     rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
 
     rb_define_singleton_method(eDS9Exception, "to_string", errors_to_string, 1);
+
+    id_on_header             = rb_intern("on_header");
+    id_on_begin_headers      = rb_intern("on_begin_headers");
+    id_on_frame_not_send     = rb_intern("on_frame_not_send");
+    id_on_begin_frame        = rb_intern("on_begin_frame");
+    id_on_invalid_frame_recv = rb_intern("on_invalid_frame_recv");
+    id_send_event            = rb_intern("send_event");
+    id_recv_event            = rb_intern("recv_event");
+    id_on_frame_send         = rb_intern("on_frame_send");
+    id_on_frame_recv         = rb_intern("on_frame_recv");
+    id_on_stream_close       = rb_intern("on_stream_close");
+    id_on_data_chunk_recv    = rb_intern("on_data_chunk_recv");
+    id_before_frame_send     = rb_intern("before_frame_send");
+    id_on_data_source_read   = rb_intern("on_data_source_read");
 }
 
 /* vim: set noet sws=4 sw=4: */
