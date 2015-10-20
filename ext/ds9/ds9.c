@@ -645,19 +645,41 @@ static VALUE make_callbacks(VALUE self, VALUE callback_list)
     nghttp2_session_callbacks *callbacks;
     nghttp2_session_callbacks_new(&callbacks);
 
-    nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
-    nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
-    nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
-    nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
-    nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
+    if (rb_obj_respond_to(self, rb_intern("on_header"), 1))
+	nghttp2_session_callbacks_set_on_header_callback(callbacks, on_header_callback);
 
-    nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
-    nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
-    nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
-    nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
-    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
-    nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
-    nghttp2_session_callbacks_set_before_frame_send_callback(callbacks, before_frame_send_callback);
+    if (rb_obj_respond_to(self, rb_intern("on_begin_headers"), 1))
+	nghttp2_session_callbacks_set_on_begin_headers_callback(callbacks, on_begin_headers_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_frame_not_send"), 1))
+	nghttp2_session_callbacks_set_on_frame_not_send_callback(callbacks, on_frame_not_send_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_begin_frame"), 1))
+	nghttp2_session_callbacks_set_on_begin_frame_callback(callbacks, on_begin_frame_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_invalid_frame_recv"), 1))
+	nghttp2_session_callbacks_set_on_invalid_frame_recv_callback(callbacks, on_invalid_frame_recv_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("send_event"), 1))
+	nghttp2_session_callbacks_set_send_callback(callbacks, send_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("recv_event"), 1))
+	nghttp2_session_callbacks_set_recv_callback(callbacks, recv_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_frame_send"), 1))
+	nghttp2_session_callbacks_set_on_frame_send_callback(callbacks, on_frame_send_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_frame_recv"), 1))
+	nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_stream_close"), 1))
+	nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("on_data_chunk_recv"), 1))
+	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
+
+    if (rb_obj_respond_to(self, rb_intern("before_frame_send"), 1))
+	nghttp2_session_callbacks_set_before_frame_send_callback(callbacks, before_frame_send_callback);
 
     return TypedData_Wrap_Struct(cDS9Callbacks, &ds9_callbacks_type, callbacks);
 }
