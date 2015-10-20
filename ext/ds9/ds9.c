@@ -640,7 +640,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     return self;
 }
 
-static VALUE make_callbacks(VALUE self, VALUE callback_list)
+static VALUE make_callbacks(VALUE self)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session_callbacks_new(&callbacks);
@@ -796,7 +796,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "stream_remote_closed?", session_stream_remote_closed_p, 1);
 
     rb_define_method(cDS9Session, "submit_request", session_submit_request, 1);
-    rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 1);
+    rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 0);
     rb_define_private_method(cDS9Client, "init_internals", client_init_internals, 1);
     rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 1);
 

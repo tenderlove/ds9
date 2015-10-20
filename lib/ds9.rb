@@ -65,15 +65,11 @@ module DS9
 
   class Session
     def initialize
-      cbs = make_callbacks callbacks
+      cbs = make_callbacks
       init_internals cbs
     end
 
     private
-
-    def callbacks
-      CALLBACKS
-    end
 
     def send_event string
       raise NotImplementedError
@@ -86,8 +82,6 @@ module DS9
     def recv_event length
       raise NotImplementedError
     end
-
-    CALLBACKS = private_instance_methods(false).grep(/^(on_|before)|event$/)
   end
 
   class Exception < StandardError
