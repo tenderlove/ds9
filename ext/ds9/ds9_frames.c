@@ -83,6 +83,14 @@ static VALUE frame_flags(VALUE self)
     return INT2NUM(frame->hd.flags);
 }
 
+static VALUE promised_stream_id(VALUE self)
+{
+    nghttp2_frame *frame;
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
+
+    return INT2NUM(frame->push_promise.promised_stream_id);
+}
+
 static VALUE frame_header(VALUE self)
 {
     nghttp2_frame *frame;
@@ -111,6 +119,7 @@ void Init_ds9_frames(VALUE mDS9)
     rb_define_method(cDS9FramesFrame, "type", frame_type, 0);
     rb_define_method(cDS9FramesFrame, "flags", frame_flags, 0);
     rb_define_method(cDS9FramesFrame, "header", frame_header, 0);
+    rb_define_method(cDS9FramesPushPromise, "promised_stream_id", promised_stream_id, 0);
 
     rb_define_const(cDS9FramesGoaway, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(cDS9FramesGoaway, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
