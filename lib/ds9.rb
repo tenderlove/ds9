@@ -21,6 +21,10 @@ module DS9
       def goaway?; false; end
       def window_update?; false; end
       def continuation?; false; end
+
+      def end_stream?
+        flags & Flags::END_STREAM > 0
+      end
     end
 
     class Continuation
@@ -60,6 +64,9 @@ module DS9
 
     class Headers
       def headers?; true; end
+      def request?;       category == REQUEST; end
+      def response?;      category == RESPONSE; end
+      def push_response?; category == PUSH_RESPONSE; end
     end
   end
 

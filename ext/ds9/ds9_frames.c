@@ -3,6 +3,7 @@
 VALUE mDS9Frames;
 
 VALUE cDS9FramesFrame;
+VALUE mDS9FramesFlags;
 VALUE cDS9FramesData;
 VALUE cDS9FramesHeaders;
 VALUE cDS9FramesPriority;
@@ -99,10 +100,20 @@ static VALUE frame_header(VALUE self)
     return WrapDS9FrameHeader((nghttp2_frame_hd *)frame);
 }
 
+static VALUE header_category(VALUE self)
+{
+    nghttp2_frame *frame;
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
+
+    return INT2NUM(frame->headers.cat);
+}
+
 void Init_ds9_frames(VALUE mDS9)
 {
     mDS9Frames = rb_define_module_under(mDS9, "Frames");
     cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cData);
+
+    mDS9FramesFlags = rb_define_module_under(cDS9FramesFrame, "Flags");
 
     cDS9FramesData = rb_define_class_under(mDS9Frames, "Data", cDS9FramesFrame);
     cDS9FramesHeaders = rb_define_class_under(mDS9Frames, "Headers", cDS9FramesFrame);
@@ -120,6 +131,14 @@ void Init_ds9_frames(VALUE mDS9)
     rb_define_method(cDS9FramesFrame, "flags", frame_flags, 0);
     rb_define_method(cDS9FramesFrame, "header", frame_header, 0);
     rb_define_method(cDS9FramesPushPromise, "promised_stream_id", promised_stream_id, 0);
+    rb_define_method(cDS9FramesHeaders, "category", header_category, 0);
+
+    rb_define_const(mDS9FramesFlags, "NONE", INT2NUM(NGHTTP2_FLAG_NONE));
+    rb_define_const(mDS9FramesFlags, "END_STREAM", INT2NUM(NGHTTP2_FLAG_END_STREAM));
+    rb_define_const(mDS9FramesFlags, "END_HEADERS", INT2NUM(NGHTTP2_FLAG_END_HEADERS));
+    rb_define_const(mDS9FramesFlags, "ACK", INT2NUM(NGHTTP2_FLAG_ACK));
+    rb_define_const(mDS9FramesFlags, "PADDED", INT2NUM(NGHTTP2_FLAG_PADDED));
+    rb_define_const(mDS9FramesFlags, "PRIORITY", INT2NUM(NGHTTP2_FLAG_PRIORITY));
 
     rb_define_const(cDS9FramesGoaway, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(cDS9FramesGoaway, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
@@ -135,6 +154,11 @@ void Init_ds9_frames(VALUE mDS9)
     rb_define_const(cDS9FramesGoaway, "ENHANCE_YOUR_CALM", INT2NUM(NGHTTP2_ENHANCE_YOUR_CALM));
     rb_define_const(cDS9FramesGoaway, "INADEQUATE_SECURITY", INT2NUM(NGHTTP2_INADEQUATE_SECURITY));
     rb_define_const(cDS9FramesGoaway, "HTTP_1_1_REQUIRED", INT2NUM(NGHTTP2_HTTP_1_1_REQUIRED));
+
+    rb_define_const(cDS9FramesHeaders, "REQUEST", INT2NUM(NGHTTP2_HCAT_REQUEST));
+    rb_define_const(cDS9FramesHeaders, "RESPONSE", INT2NUM(NGHTTP2_HCAT_RESPONSE));
+    rb_define_const(cDS9FramesHeaders, "PUSH_RESPONSE", INT2NUM(NGHTTP2_HCAT_PUSH_RESPONSE));
+    rb_define_const(cDS9FramesHeaders, "HEADERS", INT2NUM(NGHTTP2_HCAT_HEADERS));
 }
 
 /* vim: set noet sws=4 sw=4: */
