@@ -7,6 +7,18 @@
 This library allows you to write HTTP/2 clients and servers.  It is a wrapper
 around nghttp2.
 
+## INSTALLING
+
+On OS X:
+
+```
+$ brew install nghttp2
+$ gem install ds9
+```
+
+I'm not sure about other platforms, but it should Just Work if you install
+libnghttp2.
+
 ## FEATURES/PROBLEMS:
 
 * Needs nghttp2
