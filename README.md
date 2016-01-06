@@ -16,42 +16,53 @@ around nghttp2.
 Here is a full client that supports server pushes:
 
 ```ruby
+##
+# ruby client.rb https://nghttp2.org/
+# ruby client.rb https://www.google.com/
+
 require 'ds9'
 require 'socket'
 require 'openssl'
+require 'stringio'
 require 'uri'
+require 'thread'
 
 class MySession < DS9::Client
   def initialize sock
     @sock      = sock
-    @complete  = []
-    @in_flight = {}
+    @responses = Queue.new
     @requests  = []
+    @in_flight = {}
     super()
   end
 
-  def submit_request headers
-    @requests << headers
-    super
-  end
-
   def on_stream_close id, errcode
-    @complete << [@requests.shift, @in_flight.delete(id)]
-    terminate_session DS9::NO_ERROR if @requests.empty?
+    @responses << @in_flight.delete(id)
+    puts "FINISHED READING STREAM: #{id}"
+    if @requests.any?
+      submit_request @requests.pop
+    else
+      @responses << nil
+      @thread.join
+      terminate_session DS9::NO_ERROR
+    end
   end
 
   def on_begin_headers frame
-    @in_flight[frame.stream_id] = [[], []] if frame.headers?
-    @requests << []                        if frame.push_promise?
+    @in_flight[frame.stream_id] = StringIO.new if frame.headers?
+    @requests << [] if frame.push_promise?
   end
 
   def on_header name, value, frame, flags
-    @in_flight[frame.stream_id].first << [name, value] if frame.headers?
-    @requests.last << [name, value]                    if frame.push_promise?
+    if frame.push_promise?
+      @requests.last << [name, value]
+    else
+      puts "HEADER: #{name}: #{value}"
+    end
   end
 
   def on_data_chunk_recv id, data, flags
-    @in_flight[id].last << data
+    @in_flight[id] << data
   end
 
   def send_event string
@@ -68,23 +79,30 @@ class MySession < DS9::Client
   end
 
   def run
+    @thread = Thread.new do
+      while response = @responses.pop
+        yield response
+      end
+    end
+
     while want_read? || want_write?
       rd, wr, _ = IO.select([@sock], [@sock])
       receive
       send
-      yield @complete.pop if @complete.any?
     end
   end
 end
 
 uri = URI.parse ARGV[0]
 socket = TCPSocket.new uri.host, uri.port
-socket.setsockopt Socket::IPPROTO_TCP, Socket::TCP_NODELAY, 1
 
 ctx               = OpenSSL::SSL::SSLContext.new
 ctx.npn_protocols = [DS9::PROTO_VERSION_ID]
 ctx.npn_select_cb = lambda do |protocols|
-  DS9::PROTO_VERSION_ID if protocols.include?(DS9::PROTO_VERSION_ID)
+  if protocols.include?(DS9::PROTO_VERSION_ID)
+    puts "The negotiated protocol: " + DS9::PROTO_VERSION_ID
+    DS9::PROTO_VERSION_ID
+  end
 end
 
 socket            = OpenSSL::SSL::SSLSocket.new socket, ctx
@@ -95,17 +113,18 @@ socket.sync_close = true
 session = MySession.new socket
 session.submit_settings []
 
+path = uri.path == '' ? '/' : uri.path
 session.submit_request [
   [':method', 'GET'],
-  [':path', '/'],
-  [':scheme', 'https'],
+  [':path', path],
+  [':scheme', uri.scheme],
   [':authority', [uri.host, uri.port].join(':')],
   ['accept', '*/*'],
   ['user-agent', 'test'],
 ]
 
-session.run do |req, res|
-  p req => res
+session.run do |res|
+  p res
 end
 ```
 
