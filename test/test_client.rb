@@ -170,6 +170,43 @@ class TestClient < DS9::TestCase
     assert_equal [body], responses.map(&:body).map(&:string)
   end
 
+  def test_post_file
+    server, client = pipe do |req, res|
+      case req.path
+      when '/'
+        res.submit_response [[":status", '200'],
+                             ["server", 'test server'],
+                             ["date", 'Sat, 27 Jun 2015 17:29:21 GMT'],
+                             ["X-Whatever", "blah"]]
+        res.finish req.body
+      end
+    end
+
+    s = Thread.new { server.run }
+    c = Thread.new { client.run }
+
+    client.submit_request [
+      [':method', 'POST'],
+      [':path', '/'],
+      [':scheme', 'https'],
+      [':authority', ['localhost', '8080'].join(':')],
+      ['accept', '*/*'],
+      ['user-agent', 'test'],
+    ], File.open(__FILE__, "r")
+
+    responses = []
+    while response = client.responses.pop
+      responses << response
+      if responses.length == 1
+        client.terminate_session DS9::NO_ERROR
+      end
+    end
+
+    s.join
+    c.join
+    assert_equal File.read(__FILE__), responses.map(&:body).map(&:string).first
+  end
+
   def test_request
     body = 'omglolwut'
 

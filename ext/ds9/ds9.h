@@ -2,6 +2,7 @@
 #define DS9_H
 
 #include <ruby.h>
+#include <ruby/io.h>
 #include <nghttp2/nghttp2.h>
 
 static const rb_data_type_t ds9_session_type = {

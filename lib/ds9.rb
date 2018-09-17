@@ -107,7 +107,8 @@ module DS9
 
   class Client
     def submit_request headers, body = nil
-      if body
+      case body
+      when String
         body = StringIO.new body
       end
       super(headers, body)

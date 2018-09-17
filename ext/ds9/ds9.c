@@ -513,6 +513,28 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     }
 }
 
+static ssize_t
+file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
+    uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
+{
+    ssize_t nread;
+    rb_io_t * fptr;
+
+    fptr = (rb_io_t *)source->ptr;
+    rb_io_check_readable(fptr);
+
+    nread = read(fptr->fd, buf, length);
+
+    if (nread == -1) {
+	return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+    }
+
+    if (nread == 0) {
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+    }
+    return nread;
+}
+
 static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 {
     size_t niv, i;
@@ -533,8 +555,16 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     if (NIL_P(body)) {
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
     } else {
-	provider.source.ptr = body;
-	provider.read_callback = ruby_read;
+	if (TYPE(body) == T_FILE) {
+	    rb_io_t * rb_file;
+	    GetOpenFile(body, rb_file);
+	    /* Treat as a file descriptor */
+	    provider.source.ptr = rb_file;
+	    provider.read_callback = file_read;
+	} else {
+	    provider.source.ptr = body;
+	    provider.read_callback = ruby_read;
+	}
 
 	rv = nghttp2_submit_request(session, NULL, nva, niv, &provider, NULL);
     }
