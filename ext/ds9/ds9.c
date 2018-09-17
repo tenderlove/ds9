@@ -498,11 +498,27 @@ static VALUE session_outbound_queue_size(VALUE self)
     return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
-static VALUE session_submit_request(VALUE self, VALUE settings)
+static ssize_t
+ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
+    uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
+{
+    VALUE ret = rb_funcall(source->ptr, rb_intern("read"), 1, INT2NUM(length));
+
+    if (NIL_P(ret)) {
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	return 0;
+    } else {
+	memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
+	return RSTRING_LEN(ret);
+    }
+}
+
+static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 {
     size_t niv, i;
     nghttp2_nv *nva, *head;
     nghttp2_session *session;
+    nghttp2_data_provider provider;
     int rv;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
@@ -514,7 +530,14 @@ static VALUE session_submit_request(VALUE self, VALUE settings)
 
     copy_list_to_nv(settings, nva, niv);
 
-    rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
+    if (NIL_P(body)) {
+	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
+    } else {
+	provider.source.ptr = body;
+	provider.read_callback = ruby_read;
+
+	rv = nghttp2_submit_request(session, NULL, nva, niv, &provider, NULL);
+    }
 
     xfree(nva);
 
@@ -809,7 +832,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "stream_local_closed?", session_stream_local_closed_p, 1);
     rb_define_method(cDS9Session, "stream_remote_closed?", session_stream_remote_closed_p, 1);
 
-    rb_define_method(cDS9Session, "submit_request", session_submit_request, 1);
+    rb_define_private_method(cDS9Session, "submit_request", session_submit_request, 2);
     rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 0);
     rb_define_private_method(cDS9Client, "init_internals", client_init_internals, 1);
     rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 1);

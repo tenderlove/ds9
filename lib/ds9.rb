@@ -1,4 +1,5 @@
 require 'ds9.so'
+require 'stringio'
 
 module DS9
   VERSION = '1.0.0'
@@ -101,6 +102,15 @@ module DS9
     def initialize str, code
       @code = code
       super(str)
+    end
+  end
+
+  class Client
+    def submit_request headers, body = nil
+      if body
+        body = StringIO.new body
+      end
+      super(headers, body)
     end
   end
 end

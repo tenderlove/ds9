@@ -131,6 +131,7 @@ module DS9
       def initialize read, write, app
         @app           = app
         @read_streams  = {}
+        @read_post_streams  = {}
         @write_streams = {}
         super(read, write)
       end
@@ -159,10 +160,13 @@ module DS9
       end
 
       def on_header name, value, frame, flags
+        if name == ":method" && value == "POST"
+          @read_post_streams[frame.stream_id] = []
+        end
         @read_streams[frame.stream_id] << [name, value]
       end
 
-      class Request < Struct.new :stream, :stream_id, :headers
+      class Request < Struct.new :stream, :stream_id, :headers, :body
         def path
           headers[':path']
         end
@@ -183,13 +187,20 @@ module DS9
         end
       end
 
+      def on_data_chunk_recv id, data, flags
+        @read_post_streams[id] << data
+      end
+
       def on_frame_recv frame
-        return unless frame.headers?
+        return unless (frame.data? || frame.headers?) && frame.end_stream?
 
         req_headers = @read_streams[frame.stream_id]
 
         response = Response.new(self, frame.stream_id, [])
         request = Request.new(self, frame.stream_id, Hash[req_headers])
+        if @read_post_streams[frame.stream_id]
+          request.body = @read_post_streams[frame.stream_id].join
+        end
 
         @app.call request, response
 
