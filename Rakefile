@@ -12,7 +12,7 @@ gem 'rake-compiler', '>= 0.4.1'
 require "rake/extensiontask"
 
 Hoe.spec 'ds9' do
-  developer('Aaron Patterson', 'aaron@tenderlovemaking.com')
+  developer('Aaron Patterson', 'tenderlove@ruby-lang.org')
   self.readme_file   = 'README.md'
   self.history_file  = 'CHANGELOG.md'
   self.extra_rdoc_files  = FileList['*.md']
