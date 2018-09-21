@@ -1,6 +1,8 @@
 #include <ds9.h>
 #include <assert.h>
 
+typedef void (*copy_header_func_t)(VALUE, nghttp2_nv *, size_t);
+
 VALUE mDS9;
 VALUE cDS9Session;
 VALUE cDS9Client;
@@ -300,6 +302,35 @@ static void copy_list_to_nv(VALUE list, nghttp2_nv * head, size_t niv)
     }
 }
 
+struct hash_copy_ctx {
+    nghttp2_nv * head;
+};
+
+static int
+hash_copy_i(VALUE name, VALUE value, struct hash_copy_ctx * ctx)
+{
+    nghttp2_nv * head = ctx->head;
+
+    head->name = (uint8_t *)StringValuePtr(name);
+    head->namelen = RSTRING_LEN(name);
+
+    head->value = (uint8_t *)StringValuePtr(value);
+    head->valuelen = RSTRING_LEN(value);
+    head->flags = NGHTTP2_NV_FLAG_NONE;
+
+    ctx->head = head + 1;
+
+    return ST_CONTINUE;
+}
+
+static void copy_hash_to_nv(VALUE hash, nghttp2_nv * head, size_t niv)
+{
+    struct hash_copy_ctx copy_ctx;
+    copy_ctx.head = head;
+
+    rb_hash_foreach(hash, hash_copy_i, &copy_ctx);
+}
+
 static VALUE allocate_session(VALUE klass)
 {
     return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
@@ -542,15 +573,28 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     nghttp2_session *session;
     nghttp2_data_provider provider;
     int rv;
+    copy_header_func_t copy_func;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    Check_Type(settings, T_ARRAY);
-    niv = RARRAY_LEN(settings);
+    switch(TYPE(settings))
+    {
+	case T_ARRAY:
+	    niv = RARRAY_LEN(settings);
+	    copy_func = copy_list_to_nv;
+	    break;
+	case T_HASH:
+	    niv = RHASH_SIZE(settings);
+	    copy_func = copy_hash_to_nv;
+	    break;
+	default:
+	    Check_Type(settings, T_ARRAY);
+    }
+
     nva = xcalloc(niv, sizeof(nghttp2_nv));
 
-    copy_list_to_nv(settings, nva, niv);
+    copy_func(settings, nva, niv);
 
     if (NIL_P(body)) {
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
@@ -685,14 +729,28 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     nghttp2_nv *nva, *head;
     nghttp2_data_provider provider;
     int rv;
+    copy_header_func_t copy_func;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    niv = RARRAY_LEN(headers);
+    switch(TYPE(headers))
+    {
+	case T_ARRAY:
+	    niv = RARRAY_LEN(headers);
+	    copy_func = copy_list_to_nv;
+	    break;
+	case T_HASH:
+	    niv = RHASH_SIZE(headers);
+	    copy_func = copy_hash_to_nv;
+	    break;
+	default:
+	    Check_Type(headers, T_ARRAY);
+    }
+
     nva = xcalloc(niv, sizeof(nghttp2_nv));
 
-    copy_list_to_nv(headers, nva, niv);
+    copy_func(headers, nva, niv);
 
     provider.read_callback = rb_data_read_callback;
 

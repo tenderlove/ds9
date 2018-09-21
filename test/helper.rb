@@ -78,7 +78,7 @@ module DS9
       include IOEvents
 
       class Response
-        attr_reader :stream_id, :body
+        attr_reader :stream_id, :body, :headers
 
         def initialize stream_id
           @stream_id = stream_id
