@@ -287,4 +287,53 @@ class TestClient < DS9::TestCase
     assert_equal res_hash, responses.first.headers
     assert_equal ["omglolwut"], responses.map(&:body).map(&:string)
   end
+
+  def test_trailers
+    body = 'omglolwut'
+
+    req_hash = {
+      ':method'    => 'GET',
+      ':path'      => '/',
+      ':scheme'    => 'https',
+      ':authority' => ['localhost', '8080'].join(':'),
+      'accept'     => '*/*',
+      'user-agent' => 'test',
+    }
+
+    res_hash = {
+      ":status"    => '200',
+      "server"     => 'test server',
+      "date"       => 'Sat, 27 Jun 2015 17:29:21 GMT',
+      "x-whatever" => "blah"
+    }
+
+    trailers = { 'x-foo' => 'bar' }
+
+    server, client = pipe do |req, res|
+      assert_equal req_hash, req.headers
+
+      res.submit_response res_hash
+      res.trailers = trailers
+      res.finish body
+    end
+
+    client.submit_request req_hash
+
+    s = Thread.new { server.run }
+    c = Thread.new { client.run }
+
+    responses = []
+    while response = client.responses.pop
+      responses << response
+      if responses.length == 1
+        client.terminate_session DS9::NO_ERROR
+      end
+    end
+
+    s.join
+    c.join
+    assert_equal res_hash, responses.first.headers
+    assert_equal trailers, responses.first.trailers
+    assert_equal ["omglolwut"], responses.map(&:body).map(&:string)
+  end
 end

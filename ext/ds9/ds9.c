@@ -277,6 +277,12 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 	return 0;
     }
 
+    if (ret == Qfalse) {
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	*data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+	return 0;
+    }
+
     Check_Type(ret, T_STRING);
     len = RSTRING_LEN(ret);
     memcpy(buf, StringValuePtr(ret), len);
@@ -440,6 +446,48 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     rv = nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE, iv, niv);
 
     xfree(iv);
+
+    if (0 != rv) {
+	explode(rv);
+    }
+
+    return self;
+}
+
+static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
+{
+    size_t niv;
+    nghttp2_nv *nva;
+    nghttp2_session *session;
+    int rv;
+    int32_t s_id;
+    copy_header_func_t copy_func;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    s_id = NUM2INT(stream_id);
+
+    switch(TYPE(trailers))
+    {
+	case T_ARRAY:
+	    niv = RARRAY_LEN(trailers);
+	    copy_func = copy_list_to_nv;
+	    break;
+	case T_HASH:
+	    niv = RHASH_SIZE(trailers);
+	    copy_func = copy_hash_to_nv;
+	    break;
+	default:
+	    Check_Type(trailers, T_ARRAY);
+    }
+
+    nva = xcalloc(niv, sizeof(nghttp2_nv));
+    copy_func(trailers, nva, niv);
+
+    rv = nghttp2_submit_trailer(session, s_id, nva, niv);
+
+    xfree(nva);
 
     if (0 != rv) {
 	explode(rv);
@@ -928,6 +976,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
     rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
+    rb_define_method(cDS9Server, "submit_trailer", session_submit_trailer, 2);
 
     rb_define_singleton_method(eDS9Exception, "to_string", errors_to_string, 1);
 

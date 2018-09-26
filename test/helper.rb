@@ -78,16 +78,28 @@ module DS9
       include IOEvents
 
       class Response
-        attr_reader :stream_id, :body, :headers
+        attr_reader :stream_id, :body
 
         def initialize stream_id
           @stream_id = stream_id
-          @headers   = {}
+          @headers   = [{}]
           @body      = StringIO.new
         end
 
-        def [] k; @headers[k]; end
-        def []= k, v; @headers[k] = v; end
+        def headers
+          @headers[0]
+        end
+
+        def trailers
+          @headers[1]
+        end
+
+        def [] k; @headers.last[k]; end
+        def []= k, v; @headers.last[k] = v; end
+
+        def bump
+          @headers << {}
+        end
       end
 
       attr_reader :responses, :response_queue, :frames
@@ -104,7 +116,11 @@ module DS9
       end
 
       def on_begin_headers frame
-        @response_streams[frame.stream_id] = Response.new(frame.stream_id)
+        if @response_streams[frame.stream_id]
+          @response_streams[frame.stream_id].bump
+        else
+          @response_streams[frame.stream_id] = Response.new(frame.stream_id)
+        end
       end
 
       def on_header name, value, frame, flags
@@ -144,7 +160,13 @@ module DS9
       end
 
       def on_data_source_read stream_id, length
-        @write_streams[stream_id].body.shift
+        chunk = @write_streams[stream_id].body.shift
+        if chunk.nil? && @write_streams[stream_id].trailers
+          submit_trailer stream_id, @write_streams[stream_id].trailers
+          false
+        else
+          chunk
+        end
       end
 
       def on_stream_close id, error_code
@@ -172,7 +194,7 @@ module DS9
         end
       end
 
-      class Response < Struct.new :stream, :stream_id, :body
+      class Response < Struct.new :stream, :stream_id, :body, :trailers
         def push headers
           stream.submit_push_promise stream_id, headers
         end
