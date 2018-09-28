@@ -584,6 +584,8 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     VALUE ret = rb_funcall(source->ptr, rb_intern("read"), 1, INT2NUM(length));
 
     if (NIL_P(ret)) {
+	VALUE self = (VALUE)user_data;
+	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
 	return 0;
     } else {
@@ -610,6 +612,8 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 
     if (nread == 0) {
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	VALUE self = (VALUE)user_data;
+	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
     }
     return nread;
 }
@@ -665,6 +669,10 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 
     if (rv < 0) {
 	explode(rv);
+    }
+
+    if(!NIL_P(body)) {
+	rb_funcall(self, rb_intern("save_post_buffer"), 2, INT2NUM(rv), body);
     }
 
     return INT2NUM(rv);

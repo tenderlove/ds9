@@ -73,11 +73,20 @@ module DS9
 
   class Session
     def initialize
+      @post_buffers = {}
       cbs = make_callbacks
       init_internals cbs
     end
 
     private
+
+    def save_post_buffer id, stream
+      @post_buffers[id] = stream
+    end
+
+    def remove_post_buffer id
+      @post_buffers.delete id
+    end
 
     def send_event string
       raise NotImplementedError
