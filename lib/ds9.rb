@@ -2,7 +2,7 @@ require 'ds9.so'
 require 'stringio'
 
 module DS9
-  VERSION = '1.1.0'
+  VERSION = '1.1.1'
 
   module Frames
     class Frame
