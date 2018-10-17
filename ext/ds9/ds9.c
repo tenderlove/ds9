@@ -588,6 +588,8 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
 	return 0;
+    } else if (ret == Qfalse) {
+      return NGHTTP2_ERR_DEFERRED;
     } else {
 	memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
 	return RSTRING_LEN(ret);
@@ -759,6 +761,24 @@ static VALUE session_stream_remote_closed_p(VALUE self, VALUE streamid)
     }
 
     return Qfalse;
+}
+
+static VALUE session_resume_data(VALUE self, VALUE streamid)
+{
+    nghttp2_session *session;
+    int stream_id;
+    int rv;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    stream_id = NUM2INT(streamid);
+    rv = nghttp2_session_resume_data(session, stream_id);
+
+    if (rv == 0)
+      return Qtrue;
+
+    return explode(rv);
 }
 
 static VALUE session_terminate_session(VALUE self, VALUE err)
@@ -975,6 +995,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "terminate_session", session_terminate_session, 1);
     rb_define_method(cDS9Session, "stream_local_closed?", session_stream_local_closed_p, 1);
     rb_define_method(cDS9Session, "stream_remote_closed?", session_stream_remote_closed_p, 1);
+    rb_define_method(cDS9Session, "resume_data", session_resume_data, 1);
 
     rb_define_private_method(cDS9Session, "submit_request", session_submit_request, 2);
     rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 0);
