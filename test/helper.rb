@@ -143,12 +143,14 @@ module DS9
 
     class Server < DS9::Server
       include IOEvents
+      attr_reader :frames
 
       def initialize read, write, app
         @app           = app
         @read_streams  = {}
         @read_post_streams  = {}
         @write_streams = {}
+        @frames        = []
         super(read, write)
       end
 
@@ -214,6 +216,7 @@ module DS9
       end
 
       def on_frame_recv frame
+        @frames << frame
         return unless (frame.data? || frame.headers?) && frame.end_stream?
 
         req_headers = @read_streams[frame.stream_id]

@@ -41,6 +41,10 @@ module DS9
 
     class Ping
       def ping?; true; end
+
+      def ping_ack?
+        (flags & Flags::ACK) > 0
+      end
     end
 
     class Priority

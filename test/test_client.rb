@@ -78,6 +78,10 @@ class TestClient < DS9::TestCase
     server.send
     client.receive
     assert_predicate client.frames.last, :ping?
+    client.send
+    server.receive
+    assert_predicate server.frames.last, :ping?
+    assert_predicate server.frames.last, :ping_ack?
   end
 
   def test_push
