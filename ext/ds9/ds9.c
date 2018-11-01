@@ -696,6 +696,19 @@ static VALUE session_submit_shutdown(VALUE self)
     return explode(rv);
 }
 
+static VALUE session_get_last_proc_stream_id(VALUE self)
+{
+    int rv;
+    nghttp2_session *session;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    rv = nghttp2_session_get_last_proc_stream_id(session);
+
+    return INT2NUM(rv);
+}
+
 static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
 {
     int rv;
@@ -996,6 +1009,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Session, "stream_local_closed?", session_stream_local_closed_p, 1);
     rb_define_method(cDS9Session, "stream_remote_closed?", session_stream_remote_closed_p, 1);
     rb_define_method(cDS9Session, "resume_data", session_resume_data, 1);
+    rb_define_method(cDS9Session, "last_proc_stream_id", session_get_last_proc_stream_id, 0);
 
     rb_define_private_method(cDS9Session, "submit_request", session_submit_request, 2);
     rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 0);
