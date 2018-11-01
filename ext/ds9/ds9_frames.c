@@ -116,6 +116,14 @@ static VALUE goaway_last_stream_id(VALUE self)
     return INT2NUM(frame->goaway.last_stream_id);
 }
 
+static VALUE goaway_error_code(VALUE self)
+{
+    nghttp2_frame *frame;
+    TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
+
+    return INT2NUM(frame->goaway.error_code);
+}
+
 void Init_ds9_frames(VALUE mDS9)
 {
     mDS9Frames = rb_define_module_under(mDS9, "Frames");
@@ -149,6 +157,7 @@ void Init_ds9_frames(VALUE mDS9)
     rb_define_const(mDS9FramesFlags, "PRIORITY", INT2NUM(NGHTTP2_FLAG_PRIORITY));
 
     rb_define_method(cDS9FramesGoaway, "last_stream_id", goaway_last_stream_id, 0);
+    rb_define_method(cDS9FramesGoaway, "error_code", goaway_error_code, 0);
     rb_define_const(cDS9FramesGoaway, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(cDS9FramesGoaway, "PROTOCOL_ERROR", INT2NUM(NGHTTP2_PROTOCOL_ERROR));
     rb_define_const(cDS9FramesGoaway, "INTERNAL_ERROR", INT2NUM(NGHTTP2_INTERNAL_ERROR));
