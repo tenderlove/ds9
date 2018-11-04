@@ -205,6 +205,10 @@ module DS9
           stream.submit_response stream_id, headers
         end
 
+        def submit_headers headers
+          stream.submit_headers stream_id, headers
+        end
+
         def finish str
           body << str
           body << nil
