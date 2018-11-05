@@ -283,6 +283,13 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 	return 0;
     }
 
+    if (FIXNUM_P(ret)) {
+        ssize_t err = NUM2INT(ret);
+        if (err == NGHTTP2_ERR_DEFERRED) {
+            return err;
+        }
+    }
+
     Check_Type(ret, T_STRING);
     len = RSTRING_LEN(ret);
     memcpy(buf, StringValuePtr(ret), len);
@@ -975,6 +982,7 @@ void Init_ds9(void)
 
     rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
+    rb_define_const(mDS9, "ERR_DEFERRED", INT2NUM(NGHTTP2_ERR_DEFERRED));
     rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mDS9, "DEFAULT_WEIGHT", INT2NUM(NGHTTP2_DEFAULT_WEIGHT));
     rb_define_const(mDS9, "MAX_WEIGHT", INT2NUM(NGHTTP2_MAX_WEIGHT));
