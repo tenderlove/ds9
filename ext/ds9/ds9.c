@@ -595,8 +595,11 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
 	return 0;
-    } else if (ret == Qfalse) {
-      return NGHTTP2_ERR_DEFERRED;
+    } else if (FIXNUM_P(ret)) {
+        ssize_t err = NUM2INT(ret);
+        if (err == NGHTTP2_ERR_DEFERRED) {
+            return err;
+        }
     } else {
 	memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
 	return RSTRING_LEN(ret);
