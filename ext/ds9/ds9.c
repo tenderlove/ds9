@@ -600,10 +600,11 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
         if (err == NGHTTP2_ERR_DEFERRED) {
             return err;
         }
-    } else {
-	memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
-	return RSTRING_LEN(ret);
     }
+
+    Check_Type(ret, T_STRING);
+    memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
+    return RSTRING_LEN(ret);
 }
 
 static ssize_t
