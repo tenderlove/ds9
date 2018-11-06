@@ -854,6 +854,46 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     return self;
 }
 
+static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
+    nghttp2_session *session;
+    size_t niv;
+    nghttp2_nv *nva, *head;
+    int rv;
+    copy_header_func_t copy_func;
+
+    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
+    CheckSelf(session);
+
+    switch(TYPE(headers))
+    {
+	case T_ARRAY:
+	    niv = RARRAY_LEN(headers);
+	    copy_func = copy_list_to_nv;
+	    break;
+	case T_HASH:
+	    niv = RHASH_SIZE(headers);
+	    copy_func = copy_hash_to_nv;
+	    break;
+	default:
+	    Check_Type(headers, T_ARRAY);
+    }
+
+    nva = xcalloc(niv, sizeof(nghttp2_nv));
+
+    copy_func(headers, nva, niv);
+
+    /* nghttp2_submit_headers is too low level API for ds9 */
+    rv = nghttp2_submit_response(session, NUM2INT(stream_id), nva, niv, NULL);
+
+    xfree(nva);
+
+    if (0 != rv) {
+	explode(rv);
+    }
+
+    return self;
+}
+
 static VALUE make_callbacks(VALUE self)
 {
     nghttp2_session_callbacks *callbacks;
@@ -1020,6 +1060,7 @@ void Init_ds9(void)
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);
     rb_define_method(cDS9Server, "submit_shutdown", session_submit_shutdown, 0);
     rb_define_method(cDS9Server, "submit_trailer", session_submit_trailer, 2);
+    rb_define_method(cDS9Server, "submit_headers", server_submit_headers, 2);
 
     rb_define_singleton_method(eDS9Exception, "to_string", errors_to_string, 1);
 
