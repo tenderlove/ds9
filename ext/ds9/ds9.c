@@ -283,6 +283,13 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 	return 0;
     }
 
+    if (FIXNUM_P(ret)) {
+        ssize_t err = NUM2INT(ret);
+        if (err == NGHTTP2_ERR_DEFERRED) {
+            return err;
+        }
+    }
+
     Check_Type(ret, T_STRING);
     len = RSTRING_LEN(ret);
     memcpy(buf, StringValuePtr(ret), len);
@@ -588,12 +595,16 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
 	return 0;
-    } else if (ret == Qfalse) {
-      return NGHTTP2_ERR_DEFERRED;
-    } else {
-	memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
-	return RSTRING_LEN(ret);
+    } else if (FIXNUM_P(ret)) {
+        ssize_t err = NUM2INT(ret);
+        if (err == NGHTTP2_ERR_DEFERRED) {
+            return err;
+        }
     }
+
+    Check_Type(ret, T_STRING);
+    memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
+    return RSTRING_LEN(ret);
 }
 
 static ssize_t
@@ -1015,6 +1026,7 @@ void Init_ds9(void)
 
     rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
+    rb_define_const(mDS9, "ERR_DEFERRED", INT2NUM(NGHTTP2_ERR_DEFERRED));
     rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mDS9, "DEFAULT_WEIGHT", INT2NUM(NGHTTP2_DEFAULT_WEIGHT));
     rb_define_const(mDS9, "MAX_WEIGHT", INT2NUM(NGHTTP2_MAX_WEIGHT));
