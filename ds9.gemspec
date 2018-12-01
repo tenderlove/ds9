@@ -24,6 +24,8 @@ Gem::Specification.new do |s|
   s.rdoc_options = ["--main", "README.md"]
   s.date = "2015-07-06"
 
+  s.add_runtime_dependency "mini_portile2", ">= 2.2.0"
+
   s.add_development_dependency "bundler"
   s.add_development_dependency "minitest", "~> 5.7"
   s.add_development_dependency "rdoc", "~> 4.0"
