@@ -9,19 +9,33 @@ around nghttp2.
 
 ## INSTALLING
 
-On OS X:
+Add this line to your application's Gemfile:
 
+```ruby
+gem ds9
 ```
-$ brew install nghttp2
+
+And then execute:
+
+```shell
+$ bundle install
+```
+
+Or install it yourself as:
+
+```shell
 $ gem install ds9
 ```
 
-I'm not sure about other platforms, but it should Just Work if you install
-libnghttp2.
+To install this gem without nghttp2:
 
-## FEATURES/PROBLEMS:
+Use `DS9_USE_SYSTEM_LIBRARIES` ENV var:
 
-* Needs nghttp2
+```shell
+$ DS9_USE_SYSTEM_LIBRARIES=1 bundle install
+```
+
+or, the `--use-system-libraries` option:
 
 ## SYNOPSIS:
 
@@ -142,22 +156,10 @@ end
 
 ## HACKING:
 
-On OS X:
-
 ```
-$ brew install nghttp2
-$ gem install hoe rake-compiler
-$ rake compile test
+$ bundle install
+$ bundle exec rake compile test
 ```
-
-## REQUIREMENTS:
-
-* Needs nghttp2
-
-## INSTALL:
-
-* brew install nghttp2
-* gem install ds9
 
 ## LICENSE:
 
