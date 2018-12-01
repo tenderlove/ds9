@@ -4,7 +4,7 @@ require "ds9/version"
 
 Gem::Specification.new do |s|
   s.name = "ds9"
-  s.version = Ds9::VERSION
+  s.version = DS9::VERSION
   s.authors = ["Aaron Patterson", "Yuta Iwama"]
   s.email = ["tenderlove@ruby-lang.org", "ganmacs@gmail.com"]
 
