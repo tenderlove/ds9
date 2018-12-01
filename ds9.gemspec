@@ -5,22 +5,24 @@ require "ds9/version"
 Gem::Specification.new do |s|
   s.name = "ds9"
   s.version = Ds9::VERSION
-
-  s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.require_paths = ["lib"]
   s.authors = ["Aaron Patterson"]
-  s.date = "2015-07-06"
-  s.description = "This library allows you to write HTTP/2 clients and servers.  It is a wrapper\naround nghttp2."
   s.email = ["tenderlove@ruby-lang.org"]
-  s.extensions = ["ext/ds9/extconf.rb"]
-  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md"]
-  s.files = `git ls-files -z`.split("\x0")
+
+  s.summary = "This library allows you to write HTTP/2 clients and servers"
+  s.description = "This library allows you to write HTTP/2 clients and servers. It is a wrapper\naround nghttp2."
   s.homepage = "https://github.com/tenderlove/ds9"
   s.licenses = ["MIT"]
-  s.rdoc_options = ["--main", "README.md"]
+
+  s.files = `git ls-files -z`.split("\x0")
+  s.require_paths = ["lib"]
+  s.extensions = ["ext/ds9/extconf.rb"]
+
   s.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
   s.rubygems_version = "2.4.8"
-  s.summary = "This library allows you to write HTTP/2 clients and servers"
+  s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
+  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md"]
+  s.rdoc_options = ["--main", "README.md"]
+  s.date = "2015-07-06"
 
   s.add_development_dependency(%q<minitest>, ["~> 5.7"])
   s.add_development_dependency(%q<rdoc>, ["~> 4.0"])
