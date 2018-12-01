@@ -13,7 +13,7 @@ Gem::Specification.new do |s|
   s.description = "This library allows you to write HTTP/2 clients and servers.  It is a wrapper\naround nghttp2."
   s.email = ["tenderlove@ruby-lang.org"]
   s.extensions = ["ext/ds9/extconf.rb"]
-  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md", "CHANGELOG.md", "README.md"]
+  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md"]
   s.files = [".autotest", ".gemtest", "CHANGELOG.md", "Manifest.txt", "README.md", "Rakefile", "ext/ds9/ds9.c", "ext/ds9/ds9.h", "ext/ds9/ds9_frames.c", "ext/ds9/extconf.rb", "lib/ds9.rb", "test/helper.rb", "test/test_client.rb", "test/test_ds9.rb"]
   s.homepage = "https://github.com/tenderlove/ds9"
   s.licenses = ["MIT"]
