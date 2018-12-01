@@ -26,6 +26,6 @@ Gem::Specification.new do |s|
 
   s.add_development_dependency "minitest", "~> 5.7"
   s.add_development_dependency "rdoc", "~> 4.0"
-  s.add_development_dependency "rake-compiler", ">= 0.4.1"
+  s.add_development_dependency "rake-compiler", ">= 1.0.5"
   s.add_development_dependency "hoe", "~> 3.13"
 end
