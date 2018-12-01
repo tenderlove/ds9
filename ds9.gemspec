@@ -24,8 +24,8 @@ Gem::Specification.new do |s|
   s.rdoc_options = ["--main", "README.md"]
   s.date = "2015-07-06"
 
-  s.add_development_dependency(%q<minitest>, ["~> 5.7"])
-  s.add_development_dependency(%q<rdoc>, ["~> 4.0"])
-  s.add_development_dependency(%q<rake-compiler>, [">= 0.4.1"])
-  s.add_development_dependency(%q<hoe>, ["~> 3.13"])
+  s.add_development_dependency "minitest", "~> 5.7"
+  s.add_development_dependency "rdoc", "~> 4.0"
+  s.add_development_dependency "rake-compiler", ">= 0.4.1"
+  s.add_development_dependency "hoe", "~> 3.13"
 end
