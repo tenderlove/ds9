@@ -18,7 +18,7 @@ Gem::Specification.new do |s|
   s.homepage = "https://github.com/tenderlove/ds9"
   s.licenses = ["MIT"]
   s.rdoc_options = ["--main", "README.md"]
-  s.required_ruby_version = Gem::Requirement.new(">= 2.2.2")
+  s.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
   s.rubygems_version = "2.4.8"
   s.summary = "This library allows you to write HTTP/2 clients and servers"
 
