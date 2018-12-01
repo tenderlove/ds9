@@ -1,10 +1,11 @@
-# -*- encoding: utf-8 -*-
-# stub: ds9 1.0.0.20150706142441 ruby lib
-# stub: ext/ds9/extconf.rb
+# coding: utf-8
+lib = File.expand_path("../lib", __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require "ds9/version"
 
 Gem::Specification.new do |s|
   s.name = "ds9"
-  s.version = "1.0.0"
+  s.version = Ds9::VERSION
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.require_paths = ["lib"]
