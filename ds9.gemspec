@@ -5,8 +5,8 @@ require "ds9/version"
 Gem::Specification.new do |s|
   s.name = "ds9"
   s.version = Ds9::VERSION
-  s.authors = ["Aaron Patterson"]
-  s.email = ["tenderlove@ruby-lang.org"]
+  s.authors = ["Aaron Patterson", "Yuta Iwama"]
+  s.email = ["tenderlove@ruby-lang.org", "ganmacs@gmail.com"]
 
   s.summary = "This library allows you to write HTTP/2 clients and servers"
   s.description = "This library allows you to write HTTP/2 clients and servers. It is a wrapper\naround nghttp2."
