@@ -1,29 +1,31 @@
-# -*- encoding: utf-8 -*-
-# stub: ds9 1.0.0.20150706142441 ruby lib
-# stub: ext/ds9/extconf.rb
+lib = File.expand_path("../lib", __FILE__)
+$LOAD_PATH.unshift(lib) unless $LOAD_PATH.include?(lib)
+require "ds9/version"
 
 Gem::Specification.new do |s|
   s.name = "ds9"
-  s.version = "1.0.0"
+  s.version = DS9::VERSION
+  s.authors = ["Aaron Patterson", "Yuta Iwama"]
+  s.email = ["tenderlove@ruby-lang.org", "ganmacs@gmail.com"]
 
-  s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
-  s.require_paths = ["lib"]
-  s.authors = ["Aaron Patterson"]
-  s.date = "2015-07-06"
-  s.description = "This library allows you to write HTTP/2 clients and servers.  It is a wrapper\naround nghttp2."
-  s.email = ["tenderlove@ruby-lang.org"]
-  s.extensions = ["ext/ds9/extconf.rb"]
-  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md", "CHANGELOG.md", "README.md"]
-  s.files = [".autotest", ".gemtest", "CHANGELOG.md", "Manifest.txt", "README.md", "Rakefile", "ext/ds9/ds9.c", "ext/ds9/ds9.h", "ext/ds9/ds9_frames.c", "ext/ds9/extconf.rb", "lib/ds9.rb", "test/helper.rb", "test/test_client.rb", "test/test_ds9.rb"]
+  s.summary = "This library allows you to write HTTP/2 clients and servers"
+  s.description = "This library allows you to write HTTP/2 clients and servers. It is a wrapper\naround nghttp2."
   s.homepage = "https://github.com/tenderlove/ds9"
   s.licenses = ["MIT"]
-  s.rdoc_options = ["--main", "README.md"]
-  s.required_ruby_version = Gem::Requirement.new(">= 2.2.2")
-  s.rubygems_version = "2.4.8"
-  s.summary = "This library allows you to write HTTP/2 clients and servers"
 
-  s.add_development_dependency(%q<minitest>, ["~> 5.7"])
-  s.add_development_dependency(%q<rdoc>, ["~> 4.0"])
-  s.add_development_dependency(%q<rake-compiler>, [">= 0.4.1"])
-  s.add_development_dependency(%q<hoe>, ["~> 3.13"])
+  s.files = `git ls-files -z`.split("\x0")
+  s.require_paths = ["lib"]
+  s.extensions = ["ext/ds9/extconf.rb"]
+
+  s.required_ruby_version = Gem::Requirement.new(">= 2.3.0")
+  s.rubygems_version = "2.4.8"
+  s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
+  s.extra_rdoc_files = ["CHANGELOG.md", "Manifest.txt", "README.md"]
+  s.rdoc_options = ["--main", "README.md"]
+  s.date = "2015-07-06"
+
+  s.add_development_dependency "minitest", "~> 5.7"
+  s.add_development_dependency "rdoc", "~> 4.0"
+  s.add_development_dependency "rake-compiler", ">= 0.4.1"
+  s.add_development_dependency "hoe", "~> 3.13"
 end

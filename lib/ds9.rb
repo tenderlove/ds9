@@ -1,9 +1,8 @@
 require 'ds9.so'
 require 'stringio'
+require 'ds9/version'
 
 module DS9
-  VERSION = '1.3.0'
-
   module Frames
     class Frame
       Header = Struct.new :length, :stream_id, :type, :flags
