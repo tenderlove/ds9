@@ -35,7 +35,7 @@ else
   # `recipe.activate` uses invalid path for this package.
   $LIBPATH = ["#{recipe.path}/lib"] + $LIBPATH
   $CPPFLAGS << " -I#{recipe.path}/include"
-  $LIBS << " -lnghttp2 -lstdc++"
+  $LIBS << " -lstdc++"
 end
 
 abort 'nghttp2/nghttp2.h not found' unless have_header('nghttp2/nghttp2.h')
