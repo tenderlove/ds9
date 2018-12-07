@@ -4,6 +4,8 @@ def using_system_libraries?
   arg_config('--use-system-libraries', !!ENV['DS9_USE_SYSTEM_LIBRARIES'])
 end
 
+dir_config('ds9')
+
 if using_system_libraries?
   if with_config("static")
     ldflags = pkg_config 'libnghttp2', 'libs-only-L'
@@ -22,8 +24,7 @@ else
   require 'rubygems'
   require 'mini_portile2'
   recipe = MiniPortile.new('nghttp2', 'v1.34.0')
-  # We need to compile nghttp2 with `-fPIC` option, so delete `--disable-shared` from MiniPortile#configure_defaults
-  recipe.configure_options = ['--enable-lib-only', '--enable-static', "--host=#{recipe.host}"]
+  recipe.configure_options = recipe.configure_options + ['--with-pic']
 
   recipe.files << {
     url: 'https://github.com/nghttp2/nghttp2/releases/download/v1.34.0/nghttp2-1.34.0.tar.gz',
@@ -34,7 +35,7 @@ else
   # `recipe.activate` uses invalid path for this package.
   $LIBPATH = ["#{recipe.path}/lib"] + $LIBPATH
   $CPPFLAGS << " -I#{recipe.path}/include"
-  $LIBS << " -lnghttp2 -lstdc++"
+  $LIBS << " -lstdc++"
 end
 
 abort 'nghttp2/nghttp2.h not found' unless have_header('nghttp2/nghttp2.h')
