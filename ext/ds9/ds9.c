@@ -1027,6 +1027,7 @@ void Init_ds9(void)
     rb_define_const(mDS9, "ERR_WOULDBLOCK", INT2NUM(NGHTTP2_ERR_WOULDBLOCK));
     rb_define_const(mDS9, "ERR_EOF", INT2NUM(NGHTTP2_ERR_EOF));
     rb_define_const(mDS9, "ERR_DEFERRED", INT2NUM(NGHTTP2_ERR_DEFERRED));
+    rb_define_const(mDS9, "ERR_BAD_CLIENT_MAGIC", INT2NUM(NGHTTP2_ERR_BAD_CLIENT_MAGIC));
     rb_define_const(mDS9, "NO_ERROR", INT2NUM(NGHTTP2_NO_ERROR));
     rb_define_const(mDS9, "DEFAULT_WEIGHT", INT2NUM(NGHTTP2_DEFAULT_WEIGHT));
     rb_define_const(mDS9, "MAX_WEIGHT", INT2NUM(NGHTTP2_MAX_WEIGHT));
