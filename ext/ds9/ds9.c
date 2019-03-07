@@ -349,10 +349,11 @@ static VALUE allocate_session(VALUE klass)
     return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
 }
 
-static VALUE client_init_internals(VALUE self, VALUE cb)
+static VALUE client_init_internals(VALUE self, VALUE cb, VALUE opt)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
+    nghttp2_option *option;
     nghttp2_mem mem = {
 	NULL,
 	wrap_xmalloc,
@@ -362,17 +363,18 @@ static VALUE client_init_internals(VALUE self, VALUE cb)
     };
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
-
-    nghttp2_session_client_new3(&session, callbacks, (void *)self, NULL, &mem);
+    option = UnwrapDS9Option(opt);
+    nghttp2_session_client_new3(&session, callbacks, (void *)self, option, &mem);
     DATA_PTR(self) = session;
 
     return self;
 }
 
-static VALUE server_init_internals(VALUE self, VALUE cb)
+static VALUE server_init_internals(VALUE self, VALUE cb, VALUE opt)
 {
     nghttp2_session_callbacks *callbacks;
     nghttp2_session *session;
+    nghttp2_option *option;
     nghttp2_mem mem = {
 	NULL,
 	wrap_xmalloc,
@@ -382,8 +384,8 @@ static VALUE server_init_internals(VALUE self, VALUE cb)
     };
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
-
-    nghttp2_session_server_new3(&session, callbacks, (void *)self, NULL, &mem);
+    option = UnwrapDS9Option(opt);
+    nghttp2_session_server_new3(&session, callbacks, (void *)self, option, &mem);
     DATA_PTR(self) = session;
 
     return self;
@@ -1010,6 +1012,7 @@ void Init_ds9(void)
     mDS9 = rb_define_module("DS9");
 
     Init_ds9_frames(mDS9);
+    Init_ds9_option(mDS9);
 
     rb_define_const(mDS9, "PROTO_VERSION_ID", rb_str_new(NGHTTP2_PROTO_VERSION_ID, NGHTTP2_PROTO_VERSION_ID_LEN));
 
@@ -1066,8 +1069,8 @@ void Init_ds9(void)
 
     rb_define_private_method(cDS9Session, "submit_request", session_submit_request, 2);
     rb_define_private_method(cDS9Session, "make_callbacks", make_callbacks, 0);
-    rb_define_private_method(cDS9Client, "init_internals", client_init_internals, 1);
-    rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 1);
+    rb_define_private_method(cDS9Client, "init_internals", client_init_internals, 2);
+    rb_define_private_method(cDS9Server, "init_internals", server_init_internals, 2);
 
     rb_define_method(cDS9Server, "submit_response", server_submit_response, 2);
     rb_define_method(cDS9Server, "submit_push_promise", server_submit_push_promise, 2);

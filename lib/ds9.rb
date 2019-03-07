@@ -75,10 +75,11 @@ module DS9
   end
 
   class Session
-    def initialize
+    # @param option [DS9::Option]
+    def initialize(option: nil)
       @post_buffers = {}
       cbs = make_callbacks
-      init_internals cbs
+      init_internals(cbs, option)
     end
 
     private
