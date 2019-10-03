@@ -24,7 +24,7 @@ else
   require 'rubygems'
   require 'mini_portile2'
   recipe = MiniPortile.new('nghttp2', 'v1.34.0')
-  recipe.configure_options = recipe.configure_options + ['--with-pic', '--disable-python-bindings']
+  recipe.configure_options = recipe.configure_options + ['--with-pic', '--enable-lib-only']
 
   recipe.files << {
     url: 'https://github.com/nghttp2/nghttp2/releases/download/v1.34.0/nghttp2-1.34.0.tar.gz',
