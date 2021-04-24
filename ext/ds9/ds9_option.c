@@ -122,6 +122,30 @@ static VALUE option_set_user_recv_extension_type(VALUE self, VALUE size)
     return self;
 }
 
+#if NGHTTP2_VERSION_NUM >= 0x012800 /* 1.40.0 */
+static VALUE option_set_max_outbound_ack(VALUE self, VALUE size)
+{
+    nghttp2_option *option;
+    TypedData_Get_Struct(self, nghttp2_option, &ds9_option_type, option);
+
+    nghttp2_option_set_max_outbound_ack(option, NUM2INT(size));
+
+    return self;
+}
+#endif
+
+#if NGHTTP2_VERSION_NUM >= 0x012900 /* 1.41.0 */
+static VALUE option_set_max_settings(VALUE self, VALUE size)
+{
+    nghttp2_option *option;
+    TypedData_Get_Struct(self, nghttp2_option, &ds9_option_type, option);
+
+    nghttp2_option_set_max_settings(option, NUM2INT(size));
+
+    return self;
+}
+#endif
+
 nghttp2_option* UnwrapDS9Option(VALUE opt)
 {
     nghttp2_option* option = NULL;
@@ -150,4 +174,10 @@ void Init_ds9_option(VALUE mDS9)
     rb_define_method(cDS9Option, "set_max_reserved_remote_streams", option_set_max_reserved_remote_streams, 1);
     rb_define_method(cDS9Option, "set_peer_max_concurrent_streams", option_set_peer_max_concurrent_streams, 1);
     rb_define_method(cDS9Option, "set_user_recv_extension_type", option_set_user_recv_extension_type, 1);
+#if NGHTTP2_VERSION_NUM >= 0x012800 /* 1.40.0 */
+    rb_define_method(cDS9Option, "set_max_outbound_ack", option_set_max_outbound_ack, 1);
+#endif
+#if NGHTTP2_VERSION_NUM >= 0x012900 /* 1.41.0 */
+    rb_define_method(cDS9Option, "set_max_settings", option_set_max_settings, 1);
+#endif
 }

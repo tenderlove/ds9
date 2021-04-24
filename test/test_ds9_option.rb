@@ -84,4 +84,24 @@ class TestMeme < Minitest::Test
       assert @option.set_user_recv_extension_type('invalid')
     end
   end
+
+  def test_set_max_outbound_ack
+    assert @option.set_max_outbound_ack(100)
+  end
+
+  def test_set_max_outbound_ack_with_not_num
+    assert_raises TypeError do
+      assert @option.set_max_outbound_ack('invalid')
+    end
+  end
+
+  def test_set_max_settings
+    assert @option.set_max_settings(16)
+  end
+
+  def test_set_max_settings_with_not_num
+    assert_raises TypeError do
+      assert @option.set_max_settings('invalid')
+    end
+  end
 end
