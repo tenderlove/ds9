@@ -490,6 +490,7 @@ static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
 	    break;
 	default:
 	    Check_Type(trailers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -658,6 +659,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	    break;
 	default:
 	    Check_Type(settings, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -849,6 +851,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 	    break;
 	default:
 	    Check_Type(headers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -890,6 +893,7 @@ static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
 	    break;
 	default:
 	    Check_Type(headers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
