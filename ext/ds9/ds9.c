@@ -635,8 +635,8 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 
 static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 {
-    size_t niv, i;
-    nghttp2_nv *nva, *head;
+    size_t niv;
+    nghttp2_nv *nva;
     nghttp2_session *session;
     nghttp2_data_provider provider;
     int rv;
@@ -828,7 +828,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 {
     nghttp2_session *session;
     size_t niv;
-    nghttp2_nv *nva, *head;
+    nghttp2_nv *nva;
     nghttp2_data_provider provider;
     int rv;
     copy_header_func_t copy_func;
@@ -870,7 +870,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
     nghttp2_session *session;
     size_t niv;
-    nghttp2_nv *nva, *head;
+    nghttp2_nv *nva;
     int rv;
     copy_header_func_t copy_func;
 
