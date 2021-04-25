@@ -157,7 +157,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
     VALUE ret;
     ssize_t len;
 
-    ret = rb_funcall(self, id_recv_event, 1, INT2NUM(length));
+    ret = rb_funcall(self, id_recv_event, 1, ULONG2NUM(length));
 
     if (FIXNUM_P(ret)) {
 	return NUM2INT(ret);
@@ -270,7 +270,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
     ssize_t len;
 
     ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
-	    INT2NUM(length));
+	    ULONG2NUM(length));
 
     if (NIL_P(ret)) {
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
@@ -553,7 +553,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 	explode((int)rv);
     }
 
-    return INT2NUM(rv);
+    return ULONG2NUM(rv);
 }
 
 static VALUE session_mem_send(VALUE self)
@@ -585,14 +585,14 @@ static VALUE session_outbound_queue_size(VALUE self)
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
+    return ULONG2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
 static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    VALUE ret = rb_funcall((VALUE)source->ptr, rb_intern("read"), 1, INT2NUM(length));
+    VALUE ret = rb_funcall((VALUE)source->ptr, rb_intern("read"), 1, ULONG2NUM(length));
 
     if (NIL_P(ret)) {
 	VALUE self = (VALUE)user_data;
