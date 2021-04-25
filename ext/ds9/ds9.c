@@ -320,8 +320,9 @@ struct hash_copy_ctx {
 };
 
 static int
-hash_copy_i(VALUE name, VALUE value, struct hash_copy_ctx * ctx)
+hash_copy_i(VALUE name, VALUE value, VALUE arg)
 {
+    struct hash_copy_ctx *ctx = (struct hash_copy_ctx *)arg;
     nghttp2_nv * head = ctx->head;
 
     head->name = (uint8_t *)StringValuePtr(name);
@@ -341,7 +342,7 @@ static void copy_hash_to_nv(VALUE hash, nghttp2_nv * head, size_t niv)
     struct hash_copy_ctx copy_ctx;
     copy_ctx.head = head;
 
-    rb_hash_foreach(hash, hash_copy_i, &copy_ctx);
+    rb_hash_foreach(hash, hash_copy_i, (VALUE)&copy_ctx);
 }
 
 static VALUE allocate_session(VALUE klass)
@@ -540,7 +541,7 @@ static VALUE session_receive(VALUE self)
 
 static VALUE session_mem_receive(VALUE self, VALUE buf)
 {
-    int rv;
+    ssize_t rv;
     nghttp2_session *session;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
@@ -548,7 +549,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
-	explode(rv);
+	explode((int)rv);
     }
 
     return INT2NUM(rv);
@@ -570,7 +571,7 @@ static VALUE session_mem_send(VALUE self)
     }
 
     if (rv < 0) {
-	explode(rv);
+	explode((int)rv);
     }
 
     return rb_str_new((const char *)data, rv);
@@ -590,7 +591,7 @@ static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    VALUE ret = rb_funcall(source->ptr, rb_intern("read"), 1, INT2NUM(length));
+    VALUE ret = rb_funcall((VALUE)source->ptr, rb_intern("read"), 1, INT2NUM(length));
 
     if (NIL_P(ret)) {
 	VALUE self = (VALUE)user_data;
@@ -673,7 +674,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	    provider.source.ptr = rb_file;
 	    provider.read_callback = file_read;
 	} else {
-	    provider.source.ptr = body;
+	    provider.source.ptr = (void *)body;
 	    provider.read_callback = ruby_read;
 	}
 
