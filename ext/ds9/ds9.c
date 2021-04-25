@@ -157,7 +157,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
     VALUE ret;
     ssize_t len;
 
-    ret = rb_funcall(self, id_recv_event, 1, INT2NUM(length));
+    ret = rb_funcall(self, id_recv_event, 1, ULONG2NUM(length));
 
     if (FIXNUM_P(ret)) {
 	return NUM2INT(ret);
@@ -270,7 +270,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
     ssize_t len;
 
     ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
-	    INT2NUM(length));
+	    ULONG2NUM(length));
 
     if (NIL_P(ret)) {
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
@@ -320,8 +320,9 @@ struct hash_copy_ctx {
 };
 
 static int
-hash_copy_i(VALUE name, VALUE value, struct hash_copy_ctx * ctx)
+hash_copy_i(VALUE name, VALUE value, VALUE arg)
 {
+    struct hash_copy_ctx *ctx = (struct hash_copy_ctx *)arg;
     nghttp2_nv * head = ctx->head;
 
     head->name = (uint8_t *)StringValuePtr(name);
@@ -341,7 +342,7 @@ static void copy_hash_to_nv(VALUE hash, nghttp2_nv * head, size_t niv)
     struct hash_copy_ctx copy_ctx;
     copy_ctx.head = head;
 
-    rb_hash_foreach(hash, hash_copy_i, &copy_ctx);
+    rb_hash_foreach(hash, hash_copy_i, (VALUE)&copy_ctx);
 }
 
 static VALUE allocate_session(VALUE klass)
@@ -489,6 +490,7 @@ static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
 	    break;
 	default:
 	    Check_Type(trailers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -540,7 +542,7 @@ static VALUE session_receive(VALUE self)
 
 static VALUE session_mem_receive(VALUE self, VALUE buf)
 {
-    int rv;
+    ssize_t rv;
     nghttp2_session *session;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
@@ -548,10 +550,10 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
-	explode(rv);
+	explode((int)rv);
     }
 
-    return INT2NUM(rv);
+    return ULONG2NUM(rv);
 }
 
 static VALUE session_mem_send(VALUE self)
@@ -570,7 +572,7 @@ static VALUE session_mem_send(VALUE self)
     }
 
     if (rv < 0) {
-	explode(rv);
+	explode((int)rv);
     }
 
     return rb_str_new((const char *)data, rv);
@@ -583,14 +585,14 @@ static VALUE session_outbound_queue_size(VALUE self)
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    return INT2NUM(nghttp2_session_get_outbound_queue_size(session));
+    return ULONG2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
 static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    VALUE ret = rb_funcall(source->ptr, rb_intern("read"), 1, INT2NUM(length));
+    VALUE ret = rb_funcall((VALUE)source->ptr, rb_intern("read"), 1, ULONG2NUM(length));
 
     if (NIL_P(ret)) {
 	VALUE self = (VALUE)user_data;
@@ -635,8 +637,8 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 
 static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 {
-    size_t niv, i;
-    nghttp2_nv *nva, *head;
+    size_t niv;
+    nghttp2_nv *nva;
     nghttp2_session *session;
     nghttp2_data_provider provider;
     int rv;
@@ -657,6 +659,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	    break;
 	default:
 	    Check_Type(settings, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -673,7 +676,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	    provider.source.ptr = rb_file;
 	    provider.read_callback = file_read;
 	} else {
-	    provider.source.ptr = body;
+	    provider.source.ptr = (void *)body;
 	    provider.read_callback = ruby_read;
 	}
 
@@ -828,7 +831,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 {
     nghttp2_session *session;
     size_t niv;
-    nghttp2_nv *nva, *head;
+    nghttp2_nv *nva;
     nghttp2_data_provider provider;
     int rv;
     copy_header_func_t copy_func;
@@ -848,6 +851,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 	    break;
 	default:
 	    Check_Type(headers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -870,7 +874,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
     nghttp2_session *session;
     size_t niv;
-    nghttp2_nv *nva, *head;
+    nghttp2_nv *nva;
     int rv;
     copy_header_func_t copy_func;
 
@@ -889,6 +893,7 @@ static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
 	    break;
 	default:
 	    Check_Type(headers, T_ARRAY);
+	    UNREACHABLE;
     }
 
     nva = xcalloc(niv, sizeof(nghttp2_nv));
@@ -1043,7 +1048,7 @@ void Init_ds9(void)
 
     rb_define_singleton_method(mDS9, "nghttp_version", rb_nghttp_version, 0);
 
-    cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cData);
+    cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cObject);
 
     cDS9Session = rb_define_class_under(mDS9, "Session", rb_cObject);
     cDS9Client = rb_define_class_under(mDS9, "Client", cDS9Session);
