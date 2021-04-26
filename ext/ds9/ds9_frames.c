@@ -45,7 +45,7 @@ VALUE WrapDS9FrameHeader(const nghttp2_frame_hd *hd)
 {
     VALUE klass = rb_const_get(cDS9FramesFrame, rb_intern("Header"));
     return rb_funcall(klass, rb_intern("new"), 4,
-	    INT2NUM(hd->length),
+	    ULONG2NUM(hd->length),
 	    INT2NUM(hd->stream_id),
 	    INT2NUM(hd->type),
 	    INT2NUM(hd->flags));
