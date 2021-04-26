@@ -127,7 +127,7 @@ static VALUE goaway_error_code(VALUE self)
 void Init_ds9_frames(VALUE mDS9)
 {
     mDS9Frames = rb_define_module_under(mDS9, "Frames");
-    cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cData);
+    cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cObject);
 
     mDS9FramesFlags = rb_define_module_under(cDS9FramesFrame, "Flags");
 
