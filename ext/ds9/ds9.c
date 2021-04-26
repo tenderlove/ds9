@@ -23,7 +23,8 @@ ID id_on_header,
    id_on_stream_close,
    id_on_data_chunk_recv,
    id_on_data_source_read,
-   id_before_frame_send;
+   id_before_frame_send,
+   id_eof_p;
 
 #define CheckSelf(ptr) \
     if (NULL == (ptr)) \
@@ -592,18 +593,24 @@ static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    VALUE ret = rb_funcall((VALUE)source->ptr, rb_intern("read"), 1, ULONG2NUM(length));
+    VALUE body = (VALUE)source->ptr;
+    VALUE ret = rb_funcall(body, rb_intern("read"), 1, ULONG2NUM(length));
 
-    if (NIL_P(ret)) {
-	VALUE self = (VALUE)user_data;
-	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	return 0;
-    } else if (FIXNUM_P(ret)) {
+    if (FIXNUM_P(ret)) {
         ssize_t err = NUM2INT(ret);
         if (err == NGHTTP2_ERR_DEFERRED) {
             return err;
         }
+    }
+
+    if (NIL_P(ret) || rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0))) {
+	VALUE self = (VALUE)user_data;
+	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
+	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
+    }
+
+    if (NIL_P(ret)) {
+	return 0;
     }
 
     Check_Type(ret, T_STRING);
@@ -1098,6 +1105,7 @@ void Init_ds9(void)
     id_on_data_chunk_recv    = rb_intern("on_data_chunk_recv");
     id_before_frame_send     = rb_intern("before_frame_send");
     id_on_data_source_read   = rb_intern("on_data_source_read");
+    id_eof_p                 = rb_intern("eof?");
 }
 
 /* vim: set noet sws=4 sw=4: */
