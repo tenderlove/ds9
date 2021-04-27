@@ -603,7 +603,7 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
         }
     }
 
-    if (NIL_P(ret) || rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0))) {
+    if (NIL_P(ret) || (rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0)))) {
 	VALUE self = (VALUE)user_data;
 	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;

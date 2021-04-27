@@ -12,7 +12,7 @@ trap("INFO") {
     puts k.backtrace
     puts "#" * 90
   end
-}
+} if Signal.list.key?("INFO")
 
 module DS9
   class TestCase < Minitest::Test
