@@ -159,7 +159,7 @@ nghttp2_option* UnwrapDS9Option(VALUE opt)
 
 void Init_ds9_option(VALUE mDS9)
 {
-    cDS9Option = rb_define_class_under(mDS9, "Option", rb_cData);
+    cDS9Option = rb_define_class_under(mDS9, "Option", rb_cObject);
     rb_define_alloc_func(cDS9Option, allocate_option);
 
     rb_define_method(cDS9Option, "set_no_auto_ping_ack", option_set_no_auto_ping_ack, 0);

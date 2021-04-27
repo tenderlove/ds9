@@ -45,7 +45,7 @@ VALUE WrapDS9FrameHeader(const nghttp2_frame_hd *hd)
 {
     VALUE klass = rb_const_get(cDS9FramesFrame, rb_intern("Header"));
     return rb_funcall(klass, rb_intern("new"), 4,
-	    INT2NUM(hd->length),
+	    ULONG2NUM(hd->length),
 	    INT2NUM(hd->stream_id),
 	    INT2NUM(hd->type),
 	    INT2NUM(hd->flags));
@@ -127,7 +127,7 @@ static VALUE goaway_error_code(VALUE self)
 void Init_ds9_frames(VALUE mDS9)
 {
     mDS9Frames = rb_define_module_under(mDS9, "Frames");
-    cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cData);
+    cDS9FramesFrame = rb_define_class_under(mDS9Frames, "Frame", rb_cObject);
 
     mDS9FramesFlags = rb_define_module_under(cDS9FramesFrame, "Flags");
 
