@@ -124,6 +124,7 @@ socket = TCPSocket.new uri.host, uri.port
 
 ctx               = OpenSSL::SSL::SSLContext.new
 ctx.npn_protocols = [DS9::PROTO_VERSION_ID]
+ctx.alpn_protocols = [DS9::PROTO_VERSION_ID]
 ctx.npn_select_cb = lambda do |protocols|
   if protocols.include?(DS9::PROTO_VERSION_ID)
     puts "The negotiated protocol: " + DS9::PROTO_VERSION_ID
@@ -150,7 +151,7 @@ session.submit_request [
 ]
 
 session.run do |res|
-  p res
+  p res.string
 end
 ```
 
@@ -165,7 +166,7 @@ $ bundle exec rake compile test
 
 (The MIT License)
 
-Copyright (c) 2015 Aaron Patterson
+Copyright (c) 2021 Aaron Patterson, et al.
 
 Permission is hereby granted, free of charge, to any person obtaining
 a copy of this software and associated documentation files (the
