@@ -1056,6 +1056,7 @@ void Init_ds9(void)
     rb_define_singleton_method(mDS9, "nghttp_version", rb_nghttp_version, 0);
 
     cDS9Callbacks = rb_define_class_under(mDS9, "Callbacks", rb_cObject);
+    rb_undef_alloc_func(cDS9Callbacks);
 
     cDS9Session = rb_define_class_under(mDS9, "Session", rb_cObject);
     cDS9Client = rb_define_class_under(mDS9, "Client", cDS9Session);

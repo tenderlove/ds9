@@ -142,6 +142,17 @@ void Init_ds9_frames(VALUE mDS9)
     cDS9FramesWindowUpdate = rb_define_class_under(mDS9Frames, "WindowUpdate", cDS9FramesFrame);
     cDS9FramesContinuation = rb_define_class_under(mDS9Frames, "Continuation", cDS9FramesFrame);
 
+    rb_undef_alloc_func(cDS9FramesData);
+    rb_undef_alloc_func(cDS9FramesHeaders);
+    rb_undef_alloc_func(cDS9FramesPriority);
+    rb_undef_alloc_func(cDS9FramesRstStream);
+    rb_undef_alloc_func(cDS9FramesSettings);
+    rb_undef_alloc_func(cDS9FramesPushPromise);
+    rb_undef_alloc_func(cDS9FramesPing);
+    rb_undef_alloc_func(cDS9FramesGoaway);
+    rb_undef_alloc_func(cDS9FramesWindowUpdate);
+    rb_undef_alloc_func(cDS9FramesContinuation);
+
     rb_define_method(cDS9FramesFrame, "stream_id", frame_stream_id, 0);
     rb_define_method(cDS9FramesFrame, "type", frame_type, 0);
     rb_define_method(cDS9FramesFrame, "flags", frame_flags, 0);
