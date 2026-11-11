@@ -123,7 +123,7 @@ static int on_header_callback(nghttp2_session *session,
 
     VALUE ret = rb_funcall(self, id_on_header, 4,
 	    rb_usascii_str_new((const char *)name, namelen),
-	    rb_usascii_str_new((const char *)value, valuelen),
+	    rb_str_new((const char *)value, valuelen),
 	    WrapDS9Frame(frame),
 	    INT2NUM(flags));
 
