@@ -414,81 +414,83 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
     return FIX2LONG(ret);
 }
 
-static void copy_list_to_nv(VALUE list, nghttp2_nv * head, size_t niv)
+static int header_strings_i(VALUE name, VALUE value, VALUE strs)
 {
-    size_t i;
-
-    for(i = 0; i < niv; i++, head++) {
-	VALUE tuple = rb_ary_entry(list, (long)i);
-	VALUE name = rb_ary_entry(tuple, 0);
-	VALUE value = rb_ary_entry(tuple, 1);
-
-	head->name = (uint8_t *)StringValuePtr(name);
-	head->namelen = RSTRING_LEN(name);
-
-	head->value = (uint8_t *)StringValuePtr(value);
-	head->valuelen = RSTRING_LEN(value);
-	head->flags = NGHTTP2_NV_FLAG_NONE;
-    }
-}
-
-struct hash_copy_ctx {
-    nghttp2_nv * head;
-};
-
-static int
-hash_copy_i(VALUE name, VALUE value, VALUE arg)
-{
-    struct hash_copy_ctx *ctx = (struct hash_copy_ctx *)arg;
-    nghttp2_nv * head = ctx->head;
-
-    head->name = (uint8_t *)StringValuePtr(name);
-    head->namelen = RSTRING_LEN(name);
-
-    head->value = (uint8_t *)StringValuePtr(value);
-    head->valuelen = RSTRING_LEN(value);
-    head->flags = NGHTTP2_NV_FLAG_NONE;
-
-    ctx->head = head + 1;
-
+    StringValue(name);
+    StringValue(value);
+    rb_ary_push(strs, name);
+    rb_ary_push(strs, value);
     return ST_CONTINUE;
 }
 
-static void copy_hash_to_nv(VALUE hash, nghttp2_nv * head, size_t niv)
+/* An Array of [name, value] pairs, or a Hash, as names and values */
+static VALUE header_strings(VALUE headers)
 {
-    struct hash_copy_ctx copy_ctx;
-    copy_ctx.head = head;
+    VALUE strs;
+    long i;
 
-    rb_hash_foreach(hash, hash_copy_i, (VALUE)&copy_ctx);
-}
-
-/*
- * The number of nghttp2_nv entries an Array of [name, value] pairs, or a
- * Hash, of headers needs. Allocate them with ALLOCV_N, so that they aren't
- * leaked when a name or value isn't a String, and fill them in with
- * headers_to_nv.
- */
-static size_t headers_count(VALUE headers)
-{
     switch(TYPE(headers))
     {
 	case T_ARRAY:
-	    return RARRAY_LEN(headers);
+	    strs = rb_ary_new_capa(RARRAY_LEN(headers) * 2);
+	    for (i = 0; i < RARRAY_LEN(headers); i++) {
+		VALUE tuple = rb_ary_entry(headers, i);
+		header_strings_i(rb_ary_entry(tuple, 0), rb_ary_entry(tuple, 1), strs);
+	    }
+	    return strs;
 	case T_HASH:
-	    return RHASH_SIZE(headers);
+	    strs = rb_ary_new_capa(RHASH_SIZE(headers) * 2);
+	    rb_hash_foreach(headers, header_strings_i, strs);
+	    return strs;
 	default:
 	    Check_Type(headers, T_ARRAY);
-	    UNREACHABLE_RETURN(0);
+	    UNREACHABLE_RETURN(Qnil);
     }
 }
 
-static void headers_to_nv(VALUE headers, nghttp2_nv *nva, size_t niv)
+/*
+ * Converts an Array of [name, value] pairs, or a Hash, of headers to the
+ * nghttp2_nv array nghttp2 takes. The names and values are copied in after
+ * it, rather than pointed to where they are in their Strings: nghttp2
+ * allocates before copying them, which can run GC, and compaction can move
+ * a String's contents. Free it with ALLOCV_END(*buf).
+ */
+static nghttp2_nv *headers_to_nv(VALUE headers, size_t *niv, VALUE *buf)
 {
-    if (RB_TYPE_P(headers, T_HASH)) {
-	copy_hash_to_nv(headers, nva, niv);
-    } else {
-	copy_list_to_nv(headers, nva, niv);
+    VALUE strs = header_strings(headers);
+    long nstrs = RARRAY_LEN(strs), i;
+    size_t n = nstrs / 2, total = 0;
+    nghttp2_nv *nva;
+    uint8_t *bytes;
+
+    for (i = 0; i < nstrs; i++)
+	total += RSTRING_LEN(RARRAY_AREF(strs, i));
+
+    /* Allocated before any pointers into the Strings are taken */
+    nva = rb_alloc_tmp_buffer(buf, n * sizeof(nghttp2_nv) + total);
+    bytes = (uint8_t *)(nva + n);
+
+    for (i = 0; i < (long)n; i++) {
+	VALUE name = RARRAY_AREF(strs, i * 2);
+	VALUE value = RARRAY_AREF(strs, i * 2 + 1);
+	nghttp2_nv *nv = &nva[i];
+
+	nv->name = bytes;
+	nv->namelen = RSTRING_LEN(name);
+	memcpy(bytes, RSTRING_PTR(name), nv->namelen);
+	bytes += nv->namelen;
+
+	nv->value = bytes;
+	nv->valuelen = RSTRING_LEN(value);
+	memcpy(bytes, RSTRING_PTR(value), nv->valuelen);
+	bytes += nv->valuelen;
+
+	nv->flags = NGHTTP2_NV_FLAG_NONE;
     }
+
+    RB_GC_GUARD(strs);
+    *niv = n;
+    return nva;
 }
 
 static VALUE allocate_session(VALUE klass)
@@ -629,9 +631,7 @@ static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
 
     s_id = NUM2INT(stream_id);
 
-    niv = headers_count(trailers);
-    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
-    headers_to_nv(trailers, nva, niv);
+    nva = headers_to_nv(trailers, &niv, &nva_buf);
 
     rv = nghttp2_submit_trailer(session, s_id, nva, niv);
 
@@ -816,9 +816,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 
     session = get_session(self);
 
-    niv = headers_count(settings);
-    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
-    headers_to_nv(settings, nva, niv);
+    nva = headers_to_nv(settings, &niv, &nva_buf);
 
     if (NIL_P(body)) {
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
@@ -983,9 +981,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
 
     session = get_session(self);
 
-    niv = headers_count(headers);
-    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
-    headers_to_nv(headers, nva, niv);
+    nva = headers_to_nv(headers, &niv, &nva_buf);
 
     provider.read_callback = rb_data_read_callback;
 
@@ -1009,9 +1005,7 @@ static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
 
     session = get_session(self);
 
-    niv = headers_count(headers);
-    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
-    headers_to_nv(headers, nva, niv);
+    nva = headers_to_nv(headers, &niv, &nva_buf);
 
     /* nghttp2_submit_headers is too low level API for ds9 */
     rv = nghttp2_submit_response(session, NUM2INT(stream_id), nva, niv, NULL);
@@ -1081,9 +1075,7 @@ static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE heade
     session = get_session(self);
 
     Check_Type(headers, T_ARRAY);
-    niv = headers_count(headers);
-    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
-    headers_to_nv(headers, nva, niv);
+    nva = headers_to_nv(headers, &niv, &nva_buf);
 
     rv = nghttp2_submit_push_promise(session, 0, NUM2INT(stream_id), nva, niv, NULL);
 

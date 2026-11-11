@@ -37,3 +37,39 @@ class TestGC < Minitest::Test
     assert_equal "x" * 100, server.requests[1][:body]
   end
 end
+
+class TestGCHeaders < Minitest::Test
+  include DS9::InMemory
+
+  def setup
+    skip "GC compaction isn't supported" unless GC.respond_to?(:verify_compaction_references)
+  end
+
+  # Converting it compacts the heap, moving the Strings of the headers
+  # converted before it.
+  class Compacting
+    def to_str
+      GC.verify_compaction_references(expand_heap: true, toward: :empty)
+      "late"
+    end
+  end
+
+  def test_headers_survive_compaction_while_submitting
+    client = Client.new
+    server = Server.new
+    client.submit_settings []
+    server.submit_settings []
+
+    headers = [
+      [":method", "GET"],
+      [":path", "/#{"p" * 30}"],
+      [":scheme", "http"],
+      [":authority", "localhost"],
+      ["x-early", "early #{"e" * 20}"],
+    ]
+    client.request headers + [["x-late", Compacting.new]]
+    pump client, server
+
+    assert_equal headers + [["x-late", "late"]], server.requests[1][:headers]
+  end
+end
