@@ -23,12 +23,12 @@ else
   message "Building nghttp2\n"
   require 'rubygems'
   require 'mini_portile2'
-  recipe = MiniPortile.new('nghttp2', 'v1.43.0')
+  recipe = MiniPortile.new('nghttp2', 'v1.71.0')
   recipe.configure_options = recipe.configure_options + ['--with-pic', '--enable-lib-only']
 
   recipe.files << {
-    url: 'https://github.com/nghttp2/nghttp2/releases/download/v1.43.0/nghttp2-1.43.0.tar.gz',
-    sha1: '8686c8ceee769de8b9e304739b223981df9df104',
+    url: 'https://github.com/nghttp2/nghttp2/releases/download/v1.71.0/nghttp2-1.71.0.tar.gz',
+    sha256: '0cdd35ecec77919b4b7b245f87fe8d2216e3d62da854eb0838c594ff058042fc',
   }
   recipe.cook
 
