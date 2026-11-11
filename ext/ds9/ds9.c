@@ -623,12 +623,18 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
     ssize_t nread;
-    rb_io_t * fptr;
-
-    fptr = (rb_io_t *)source->ptr;
+    VALUE io = (VALUE)source->ptr;
+    int fd;
+#ifdef HAVE_RB_IO_DESCRIPTOR
+    fd = rb_io_descriptor(io);
+#else
+    rb_io_t *fptr;
+    GetOpenFile(io, fptr);
     rb_io_check_readable(fptr);
+    fd = fptr->fd;
+#endif
 
-    nread = read(fptr->fd, buf, length);
+    nread = read(fd, buf, length);
 
     if (nread == -1) {
 	return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
@@ -677,10 +683,8 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
     } else {
 	if (TYPE(body) == T_FILE) {
-	    rb_io_t * rb_file;
-	    GetOpenFile(body, rb_file);
 	    /* Treat as a file descriptor */
-	    provider.source.ptr = rb_file;
+	    provider.source.ptr = (void *)body;
 	    provider.read_callback = file_read;
 	} else {
 	    provider.source.ptr = (void *)body;
