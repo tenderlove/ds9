@@ -34,6 +34,13 @@ typedef struct {
     VALUE self;
     /* Request bodies being sent, by stream id */
     VALUE bodies;
+    /* How a callback's call into Ruby jumped out, to carry on with */
+    int jump_state;
+    /*
+     * The fatal error nghttp2 returned, if it has. nghttp2 doesn't allow the
+     * session to be used after one.
+     */
+    int fatal_error;
 } ds9_session_t;
 
 static void ds9_session_mark(void *ptr)
@@ -70,12 +77,28 @@ static ds9_session_t *get_session_struct(VALUE self)
     return s;
 }
 
+static VALUE explode(int code);
+static void ds9_resume_jump(ds9_session_t *s);
+
 static nghttp2_session *get_session(VALUE self)
 {
     ds9_session_t *s = get_session_struct(self);
     if (NULL == s->session)
 	rb_raise(eDS9UninitializedException, "not initialized, call `super` from `initialize`");
+    if (s->fatal_error)
+	explode(s->fatal_error);
     return s->session;
+}
+
+/*
+ * Call after each nghttp2 call that can run callbacks, with what it
+ * returned.
+ */
+static void ds9_check_result(ds9_session_t *s, long rv)
+{
+    if (rv < 0 && nghttp2_is_fatal((int)rv))
+	s->fatal_error = (int)rv;
+    ds9_resume_jump(s);
 }
 
 static void * wrap_xmalloc(size_t size, void *mem_user_data)
@@ -102,18 +125,88 @@ static VALUE explode(int code) {
     return rb_funcall(eDS9Exception, rb_intern("abort"), 1, INT2NUM(code));
 }
 
-static int before_frame_send_callback(nghttp2_session *session,
-				      const nghttp2_frame *frame,
-				      void *user_data)
+/*
+ * Ruby code mustn't unwind through nghttp2's frames, so callbacks call into
+ * Ruby under rb_protect. When that call raises (or throws, or is killed),
+ * the callback records how it jumped and fails, and the jump is resumed
+ * with ds9_resume_jump once nghttp2 has returned. Callbacks after a failed
+ * one fail straight away, so nothing touches errinfo in between.
+ */
+static int ds9_protect(ds9_session_t *s, VALUE (*func)(VALUE), VALUE arg, VALUE *ret)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
+    int state;
+
+    if (s->jump_state) return 0;
+
+    *ret = rb_protect(func, arg, &state);
+    if (state) {
+	s->jump_state = state;
+	return 0;
+    }
+    return 1;
+}
+
+static void ds9_resume_jump(ds9_session_t *s)
+{
+    int state = s->jump_state;
+
+    if (state) {
+	s->jump_state = 0;
+	rb_jump_tag(state);
+    }
+}
+
+struct ds9_funcall {
+    VALUE recv;
+    ID mid;
+    int argc;
+    const VALUE *argv;
+};
+
+static VALUE ds9_funcall_body(VALUE arg)
+{
+    struct ds9_funcall *c = (struct ds9_funcall *)arg;
+    return rb_funcallv(c->recv, c->mid, c->argc, c->argv);
+}
+
+/*
+ * Calls the session's `mid` for a callback that fails when it returns
+ * false. Returns what nghttp2 expects from the callback.
+ */
+static int ds9_callback(void *user_data, ID mid, int argc, const VALUE *argv)
+{
+    ds9_session_t *s = user_data;
+    struct ds9_funcall c = { s->self, mid, argc, argv };
     VALUE ret;
 
-    ret = rb_funcall(self, id_before_frame_send, 1, WrapDS9Frame(frame));
+    if (!ds9_protect(s, ds9_funcall_body, (VALUE)&c, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
 
     if (ret == Qfalse) return 1;
 
     return 0;
+}
+
+static int before_frame_send_callback(nghttp2_session *session,
+				      const nghttp2_frame *frame,
+				      void *user_data)
+{
+    VALUE argv[] = { WrapDS9Frame(frame) };
+    return ds9_callback(user_data, id_before_frame_send, 1, argv);
+}
+
+struct ds9_send_args {
+    VALUE self;
+    const uint8_t *data;
+    size_t length;
+};
+
+static VALUE send_body(VALUE arg)
+{
+    struct ds9_send_args *a = (struct ds9_send_args *)arg;
+    VALUE ret = rb_funcall(a->self, id_send_event, 1, rb_str_new((const char *)a->data, a->length));
+
+    return LONG2NUM(NUM2LONG(ret));
 }
 
 static ssize_t send_callback(nghttp2_session * session,
@@ -121,28 +214,22 @@ static ssize_t send_callback(nghttp2_session * session,
 			     size_t length,
 			     int flags, void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
+    ds9_session_t *s = user_data;
+    struct ds9_send_args a = { s->self, data, length };
     VALUE ret;
 
-    ret = rb_funcall(self, id_send_event, 1, rb_str_new((const char *)data, length));
+    if (!ds9_protect(s, send_body, (VALUE)&a, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-    return NUM2INT(ret);
+    return NUM2LONG(ret);
 }
 
 static int on_frame_recv_callback(nghttp2_session *session,
 				  const nghttp2_frame *frame,
 				  void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE ret;
-
-    ret = rb_funcall(self, id_on_frame_recv, 1, WrapDS9Frame(frame));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { WrapDS9Frame(frame) };
+    return ds9_callback(user_data, id_on_frame_recv, 1, argv);
 }
 
 static int on_stream_close_callback(nghttp2_session *session,
@@ -150,15 +237,8 @@ static int on_stream_close_callback(nghttp2_session *session,
 				    uint32_t error_code,
 				    void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-
-    VALUE ret = rb_funcall(self, id_on_stream_close, 2, INT2NUM(stream_id), UINT2NUM(error_code));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { INT2NUM(stream_id), UINT2NUM(error_code) };
+    return ds9_callback(user_data, id_on_stream_close, 2, argv);
 }
 
 static int on_header_callback(nghttp2_session *session,
@@ -167,35 +247,21 @@ static int on_header_callback(nghttp2_session *session,
 			      const uint8_t *value, size_t valuelen,
 			      uint8_t flags, void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-
-    VALUE ret = rb_funcall(self, id_on_header, 4,
-	    rb_usascii_str_new((const char *)name, namelen),
-	    rb_str_new((const char *)value, valuelen),
-	    WrapDS9Frame(frame),
-	    INT2NUM(flags));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = {
+	rb_usascii_str_new((const char *)name, namelen),
+	rb_str_new((const char *)value, valuelen),
+	WrapDS9Frame(frame),
+	INT2NUM(flags),
+    };
+    return ds9_callback(user_data, id_on_header, 4, argv);
 }
 
 static int on_begin_headers_callback(nghttp2_session *session,
 			             const nghttp2_frame *frame,
 			             void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-
-    VALUE ret = rb_funcall(self, id_on_begin_headers, 1,
-	    WrapDS9Frame(frame));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { WrapDS9Frame(frame) };
+    return ds9_callback(user_data, id_on_begin_headers, 1, argv);
 }
 
 /* Copies what a callback returned into nghttp2's buffer of `length` */
@@ -213,36 +279,42 @@ static long copy_to_buffer(VALUE str, uint8_t *buf, size_t length, const char *c
     return len;
 }
 
+struct ds9_recv_args {
+    VALUE self;
+    uint8_t *buf;
+    size_t length;
+};
+
+static VALUE recv_body(VALUE arg)
+{
+    struct ds9_recv_args *a = (struct ds9_recv_args *)arg;
+    VALUE ret = rb_funcall(a->self, id_recv_event, 1, ULONG2NUM(a->length));
+
+    if (FIXNUM_P(ret)) return ret;
+
+    return LONG2NUM(copy_to_buffer(ret, a->buf, a->length, "recv_event"));
+}
+
 static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 			     size_t length, int flags,
 			     void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
+    ds9_session_t *s = user_data;
+    struct ds9_recv_args a = { s->self, buf, length };
     VALUE ret;
 
-    ret = rb_funcall(self, id_recv_event, 1, ULONG2NUM(length));
+    if (!ds9_protect(s, recv_body, (VALUE)&a, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-    if (FIXNUM_P(ret)) {
-	return NUM2INT(ret);
-    }
-
-    return copy_to_buffer(ret, buf, length, "recv_event");
+    return FIX2LONG(ret);
 }
 
 static int on_begin_frame_callback(nghttp2_session *session,
 				   const nghttp2_frame_hd *hd,
 				   void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE ret;
-
-    ret = rb_funcall(self, id_on_begin_frame, 1, WrapDS9FrameHeader(hd));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { WrapDS9FrameHeader(hd) };
+    return ds9_callback(user_data, id_on_begin_frame, 1, argv);
 }
 
 static int on_data_chunk_recv_callback(nghttp2_session *session,
@@ -251,53 +323,28 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
 				       const uint8_t *data,
 				       size_t len, void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE ret;
-
-    ret = rb_funcall(self, id_on_data_chunk_recv, 3,
-	    INT2NUM(stream_id),
-	    rb_str_new((const char *)data, len),
-	    INT2NUM(flags));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = {
+	INT2NUM(stream_id),
+	rb_str_new((const char *)data, len),
+	INT2NUM(flags),
+    };
+    return ds9_callback(user_data, id_on_data_chunk_recv, 3, argv);
 }
 
 static int on_invalid_frame_recv_callback(nghttp2_session *session,
 					  const nghttp2_frame *frame, int lib_error_code,
 					  void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE ret;
-
-    ret = rb_funcall(self, id_on_invalid_frame_recv, 2,
-	    WrapDS9Frame(frame),
-	    INT2NUM(lib_error_code));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { WrapDS9Frame(frame), INT2NUM(lib_error_code) };
+    return ds9_callback(user_data, id_on_invalid_frame_recv, 2, argv);
 }
 
 static int on_frame_send_callback(nghttp2_session *session,
 				  const nghttp2_frame *frame,
 				  void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE ret;
-
-    ret = rb_funcall(self, id_on_frame_send, 1, WrapDS9Frame(frame));
-
-    if (ret == Qfalse) {
-	return 1;
-    }
-
-    return 0;
+    VALUE argv[] = { WrapDS9Frame(frame) };
+    return ds9_callback(user_data, id_on_frame_send, 1, argv);
 }
 
 static int on_frame_not_send_callback(nghttp2_session *session,
@@ -305,17 +352,42 @@ static int on_frame_not_send_callback(nghttp2_session *session,
 				      int lib_error_code,
 				      void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
-    VALUE reason = rb_str_new2(nghttp2_strerror(lib_error_code));
+    VALUE argv[] = { WrapDS9Frame(frame), rb_str_new2(nghttp2_strerror(lib_error_code)) };
+    return ds9_callback(user_data, id_on_frame_not_send, 2, argv);
+}
+
+struct ds9_read_args {
+    ds9_session_t *s;
+    int32_t stream_id;
+    uint8_t *buf;
+    size_t length;
+    uint32_t *data_flags;
+};
+
+static VALUE data_read_body(VALUE arg)
+{
+    struct ds9_read_args *a = (struct ds9_read_args *)arg;
     VALUE ret;
 
-    ret = rb_funcall(self, id_on_frame_not_send, 2, WrapDS9Frame(frame), reason);
+    ret = rb_funcall(a->s->self, id_on_data_source_read, 2, INT2NUM(a->stream_id),
+	    ULONG2NUM(a->length));
 
-    if (ret == Qfalse) {
-	return 1;
+    if (NIL_P(ret)) {
+	*a->data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	return INT2FIX(0);
     }
 
-    return 0;
+    if (ret == Qfalse) {
+	*a->data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	*a->data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
+	return INT2FIX(0);
+    }
+
+    if (FIXNUM_P(ret) && FIX2LONG(ret) == NGHTTP2_ERR_DEFERRED) {
+	return ret;
+    }
+
+    return LONG2NUM(copy_to_buffer(ret, a->buf, a->length, "on_data_source_read"));
 }
 
 static ssize_t rb_data_read_callback(nghttp2_session *session,
@@ -323,31 +395,13 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 				     size_t length, uint32_t *data_flags,
 				     nghttp2_data_source *source, void *user_data)
 {
-    VALUE self = ((ds9_session_t *)user_data)->self;
+    struct ds9_read_args a = { user_data, stream_id, buf, length, data_flags };
     VALUE ret;
 
-    ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
-	    ULONG2NUM(length));
+    if (!ds9_protect(user_data, data_read_body, (VALUE)&a, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-    if (NIL_P(ret)) {
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	return 0;
-    }
-
-    if (ret == Qfalse) {
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	*data_flags |= NGHTTP2_DATA_FLAG_NO_END_STREAM;
-	return 0;
-    }
-
-    if (FIXNUM_P(ret)) {
-        ssize_t err = NUM2INT(ret);
-        if (err == NGHTTP2_ERR_DEFERRED) {
-            return err;
-        }
-    }
-
-    return copy_to_buffer(ret, buf, length, "on_data_source_read");
+    return FIX2LONG(ret);
 }
 
 static void copy_list_to_nv(VALUE list, nghttp2_nv * head, size_t niv)
@@ -482,6 +536,8 @@ static VALUE session_want_write_p(VALUE self)
 {
     nghttp2_session *session;
 
+    /* A session that has failed is finished with */
+    if (get_session_struct(self)->fatal_error) return Qfalse;
     session = get_session(self);
 
     if (nghttp2_session_want_write(session) == 0) {
@@ -495,6 +551,8 @@ static VALUE session_want_read_p(VALUE self)
 {
     nghttp2_session *session;
 
+    /* A session that has failed is finished with */
+    if (get_session_struct(self)->fatal_error) return Qfalse;
     session = get_session(self);
 
     if (nghttp2_session_want_read(session) == 0) {
@@ -584,6 +642,7 @@ static VALUE session_send(VALUE self)
     session = get_session(self);
 
     rv = nghttp2_session_send(session);
+    ds9_check_result(get_session_struct(self), rv);
     if (rv != 0) {
 	explode(rv);
     }
@@ -600,6 +659,7 @@ static VALUE session_receive(VALUE self)
 
     assert(session);
     rv = nghttp2_session_recv(session);
+    ds9_check_result(get_session_struct(self), rv);
     if (rv != 0) {
 	explode(rv);
     }
@@ -615,6 +675,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
     session = get_session(self);
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
+    ds9_check_result(get_session_struct(self), rv);
     if (rv < 0) {
 	explode((int)rv);
     }
@@ -631,6 +692,7 @@ static VALUE session_mem_send(VALUE self)
     session = get_session(self);
 
     rv = nghttp2_session_mem_send(session, &data);
+    ds9_check_result(get_session_struct(self), rv);
 
     if (rv == 0) {
 	return Qfalse;
@@ -652,40 +714,46 @@ static VALUE session_outbound_queue_size(VALUE self)
     return ULONG2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
 
+static VALUE ruby_read_body(VALUE arg)
+{
+    struct ds9_read_args *a = (struct ds9_read_args *)arg;
+    VALUE body = rb_hash_aref(a->s->bodies, INT2NUM(a->stream_id));
+    VALUE ret = rb_funcall(body, rb_intern("read"), 1, ULONG2NUM(a->length));
+
+    if (FIXNUM_P(ret) && FIX2LONG(ret) == NGHTTP2_ERR_DEFERRED) {
+	return ret;
+    }
+
+    if (NIL_P(ret) || (rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0)))) {
+	rb_hash_delete(a->s->bodies, INT2NUM(a->stream_id));
+	*a->data_flags |= NGHTTP2_DATA_FLAG_EOF;
+    }
+
+    if (NIL_P(ret)) {
+	return INT2FIX(0);
+    }
+
+    return LONG2NUM(copy_to_buffer(ret, a->buf, a->length, "request body's read"));
+}
+
 static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    ds9_session_t *s = user_data;
-    VALUE body = rb_hash_aref(s->bodies, INT2NUM(stream_id));
-    VALUE ret = rb_funcall(body, rb_intern("read"), 1, ULONG2NUM(length));
+    struct ds9_read_args a = { user_data, stream_id, buf, length, data_flags };
+    VALUE ret;
 
-    if (FIXNUM_P(ret)) {
-        ssize_t err = NUM2INT(ret);
-        if (err == NGHTTP2_ERR_DEFERRED) {
-            return err;
-        }
-    }
+    if (!ds9_protect(user_data, ruby_read_body, (VALUE)&a, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
 
-    if (NIL_P(ret) || (rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0)))) {
-	rb_hash_delete(s->bodies, INT2NUM(stream_id));
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-    }
-
-    if (NIL_P(ret)) {
-	return 0;
-    }
-
-    return copy_to_buffer(ret, buf, length, "request body's read");
+    return FIX2LONG(ret);
 }
 
-static ssize_t
-file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
-    uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
+static VALUE file_read_body(VALUE arg)
 {
+    struct ds9_read_args *a = (struct ds9_read_args *)arg;
     ssize_t nread;
-    ds9_session_t *s = user_data;
-    VALUE io = rb_hash_aref(s->bodies, INT2NUM(stream_id));
+    VALUE io = rb_hash_aref(a->s->bodies, INT2NUM(a->stream_id));
     int fd;
 #ifdef HAVE_RB_IO_DESCRIPTOR
     fd = rb_io_descriptor(io);
@@ -696,17 +764,30 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     fd = fptr->fd;
 #endif
 
-    nread = read(fd, buf, length);
+    nread = read(fd, a->buf, a->length);
 
     if (nread == -1) {
-	return NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE;
+	return INT2FIX(NGHTTP2_ERR_TEMPORAL_CALLBACK_FAILURE);
     }
 
     if (nread == 0) {
-	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	rb_hash_delete(s->bodies, INT2NUM(stream_id));
+	*a->data_flags |= NGHTTP2_DATA_FLAG_EOF;
+	rb_hash_delete(a->s->bodies, INT2NUM(a->stream_id));
     }
-    return nread;
+    return LONG2NUM(nread);
+}
+
+static ssize_t
+file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
+    uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
+{
+    struct ds9_read_args a = { user_data, stream_id, buf, length, data_flags };
+    VALUE ret;
+
+    if (!ds9_protect(user_data, file_read_body, (VALUE)&a, &ret))
+	return NGHTTP2_ERR_CALLBACK_FAILURE;
+
+    return FIX2LONG(ret);
 }
 
 static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
