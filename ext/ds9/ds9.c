@@ -1,8 +1,6 @@
 #include <ds9.h>
 #include <assert.h>
 
-typedef void (*copy_header_func_t)(VALUE, nghttp2_nv *, size_t);
-
 VALUE mDS9;
 VALUE cDS9Session;
 VALUE cDS9Client;
@@ -346,6 +344,35 @@ static void copy_hash_to_nv(VALUE hash, nghttp2_nv * head, size_t niv)
     rb_hash_foreach(hash, hash_copy_i, (VALUE)&copy_ctx);
 }
 
+/*
+ * The number of nghttp2_nv entries an Array of [name, value] pairs, or a
+ * Hash, of headers needs. Allocate them with ALLOCV_N, so that they aren't
+ * leaked when a name or value isn't a String, and fill them in with
+ * headers_to_nv.
+ */
+static size_t headers_count(VALUE headers)
+{
+    switch(TYPE(headers))
+    {
+	case T_ARRAY:
+	    return RARRAY_LEN(headers);
+	case T_HASH:
+	    return RHASH_SIZE(headers);
+	default:
+	    Check_Type(headers, T_ARRAY);
+	    UNREACHABLE_RETURN(0);
+    }
+}
+
+static void headers_to_nv(VALUE headers, nghttp2_nv *nva, size_t niv)
+{
+    if (RB_TYPE_P(headers, T_HASH)) {
+	copy_hash_to_nv(headers, nva, niv);
+    } else {
+	copy_list_to_nv(headers, nva, niv);
+    }
+}
+
 static VALUE allocate_session(VALUE klass)
 {
     return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
@@ -438,14 +465,16 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
 {
     size_t niv, i;
     nghttp2_settings_entry *iv, *head;
+    VALUE iv_buf;
     nghttp2_session *session;
     int rv;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
+    Check_Type(settings, T_ARRAY);
     niv = RARRAY_LEN(settings);
-    iv = xcalloc(niv, sizeof(nghttp2_settings_entry));
+    iv = ALLOCV_N(nghttp2_settings_entry, iv_buf, niv);
     head = iv;
 
     for(i = 0; i < niv; i++, head++) {
@@ -456,7 +485,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
 
     rv = nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE, iv, niv);
 
-    xfree(iv);
+    ALLOCV_END(iv_buf);
 
     if (0 != rv) {
 	explode(rv);
@@ -472,34 +501,20 @@ static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
     nghttp2_session *session;
     int rv;
     int32_t s_id;
-    copy_header_func_t copy_func;
+    VALUE nva_buf;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
     s_id = NUM2INT(stream_id);
 
-    switch(TYPE(trailers))
-    {
-	case T_ARRAY:
-	    niv = RARRAY_LEN(trailers);
-	    copy_func = copy_list_to_nv;
-	    break;
-	case T_HASH:
-	    niv = RHASH_SIZE(trailers);
-	    copy_func = copy_hash_to_nv;
-	    break;
-	default:
-	    Check_Type(trailers, T_ARRAY);
-	    UNREACHABLE;
-    }
-
-    nva = xcalloc(niv, sizeof(nghttp2_nv));
-    copy_func(trailers, nva, niv);
+    niv = headers_count(trailers);
+    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
+    headers_to_nv(trailers, nva, niv);
 
     rv = nghttp2_submit_trailer(session, s_id, nva, niv);
 
-    xfree(nva);
+    ALLOCV_END(nva_buf);
 
     if (0 != rv) {
 	explode(rv);
@@ -655,29 +670,14 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     nghttp2_session *session;
     nghttp2_data_provider provider;
     int rv;
-    copy_header_func_t copy_func;
+    VALUE nva_buf;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    switch(TYPE(settings))
-    {
-	case T_ARRAY:
-	    niv = RARRAY_LEN(settings);
-	    copy_func = copy_list_to_nv;
-	    break;
-	case T_HASH:
-	    niv = RHASH_SIZE(settings);
-	    copy_func = copy_hash_to_nv;
-	    break;
-	default:
-	    Check_Type(settings, T_ARRAY);
-	    UNREACHABLE;
-    }
-
-    nva = xcalloc(niv, sizeof(nghttp2_nv));
-
-    copy_func(settings, nva, niv);
+    niv = headers_count(settings);
+    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
+    headers_to_nv(settings, nva, niv);
 
     if (NIL_P(body)) {
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
@@ -694,7 +694,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
 	rv = nghttp2_submit_request(session, NULL, nva, niv, &provider, NULL);
     }
 
-    xfree(nva);
+    ALLOCV_END(nva_buf);
 
     if (rv < 0) {
 	explode(rv);
@@ -845,35 +845,20 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     nghttp2_nv *nva;
     nghttp2_data_provider provider;
     int rv;
-    copy_header_func_t copy_func;
+    VALUE nva_buf;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    switch(TYPE(headers))
-    {
-	case T_ARRAY:
-	    niv = RARRAY_LEN(headers);
-	    copy_func = copy_list_to_nv;
-	    break;
-	case T_HASH:
-	    niv = RHASH_SIZE(headers);
-	    copy_func = copy_hash_to_nv;
-	    break;
-	default:
-	    Check_Type(headers, T_ARRAY);
-	    UNREACHABLE;
-    }
-
-    nva = xcalloc(niv, sizeof(nghttp2_nv));
-
-    copy_func(headers, nva, niv);
+    niv = headers_count(headers);
+    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
+    headers_to_nv(headers, nva, niv);
 
     provider.read_callback = rb_data_read_callback;
 
     rv = nghttp2_submit_response(session, NUM2INT(stream_id), nva, niv, &provider);
 
-    xfree(nva);
+    ALLOCV_END(nva_buf);
 
     if (0 != rv) {
 	explode(rv);
@@ -887,34 +872,19 @@ static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
     size_t niv;
     nghttp2_nv *nva;
     int rv;
-    copy_header_func_t copy_func;
+    VALUE nva_buf;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
-    switch(TYPE(headers))
-    {
-	case T_ARRAY:
-	    niv = RARRAY_LEN(headers);
-	    copy_func = copy_list_to_nv;
-	    break;
-	case T_HASH:
-	    niv = RHASH_SIZE(headers);
-	    copy_func = copy_hash_to_nv;
-	    break;
-	default:
-	    Check_Type(headers, T_ARRAY);
-	    UNREACHABLE;
-    }
-
-    nva = xcalloc(niv, sizeof(nghttp2_nv));
-
-    copy_func(headers, nva, niv);
+    niv = headers_count(headers);
+    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
+    headers_to_nv(headers, nva, niv);
 
     /* nghttp2_submit_headers is too low level API for ds9 */
     rv = nghttp2_submit_response(session, NUM2INT(stream_id), nva, niv, NULL);
 
-    xfree(nva);
+    ALLOCV_END(nva_buf);
 
     if (0 != rv) {
 	explode(rv);
@@ -970,34 +940,22 @@ static VALUE make_callbacks(VALUE self)
 static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE headers)
 {
     nghttp2_session *session;
-    nghttp2_nv *nva, *head;
-    size_t niv, i;
+    nghttp2_nv *nva;
+    VALUE nva_buf;
+    size_t niv;
     int rv;
 
     TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
     CheckSelf(session);
 
     Check_Type(headers, T_ARRAY);
-    niv = RARRAY_LEN(headers);
-    nva = xcalloc(niv, sizeof(nghttp2_nv));
-    head = nva;
-
-    for(i = 0; i < niv; i++, head++) {
-	VALUE tuple = rb_ary_entry(headers, (long)i);
-	VALUE name = rb_ary_entry(tuple, 0);
-	VALUE value = rb_ary_entry(tuple, 1);
-
-	head->name = (uint8_t *)StringValuePtr(name);
-	head->namelen = RSTRING_LEN(name);
-
-	head->value = (uint8_t *)StringValuePtr(value);
-	head->valuelen = RSTRING_LEN(value);
-	head->flags = NGHTTP2_NV_FLAG_NONE;
-    }
+    niv = headers_count(headers);
+    nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
+    headers_to_nv(headers, nva, niv);
 
     rv = nghttp2_submit_push_promise(session, 0, NUM2INT(stream_id), nva, niv, NULL);
 
-    xfree(nva);
+    ALLOCV_END(nva_buf);
 
     switch(rv) {
 	case NGHTTP2_ERR_NOMEM:

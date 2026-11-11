@@ -27,3 +27,19 @@ class TestHeaders < Minitest::Test
     assert_predicate value, :valid_encoding?
   end
 end
+
+class TestHeaderErrors < Minitest::Test
+  def test_non_string_header_raises
+    client = DS9::Client.new
+    assert_raises(TypeError) do
+      client.__send__(:submit_request, [[":method", 1]], nil)
+    end
+  end
+
+  def test_non_string_header_in_a_hash_raises
+    client = DS9::Client.new
+    assert_raises(TypeError) do
+      client.__send__(:submit_request, { ":method" => :get }, nil)
+    end
+  end
+end
