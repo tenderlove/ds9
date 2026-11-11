@@ -148,13 +148,27 @@ static int on_begin_headers_callback(nghttp2_session *session,
     return 0;
 }
 
+/* Copies what a callback returned into nghttp2's buffer of `length` */
+static long copy_to_buffer(VALUE str, uint8_t *buf, size_t length, const char *callback)
+{
+    long len;
+
+    Check_Type(str, T_STRING);
+    len = RSTRING_LEN(str);
+    if ((size_t)len > length)
+	rb_raise(rb_eArgError, "%s returned %ld bytes, more than the %"PRIuSIZE" asked for",
+		callback, len, length);
+
+    memcpy(buf, RSTRING_PTR(str), len);
+    return len;
+}
+
 static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 			     size_t length, int flags,
 			     void *user_data)
 {
     VALUE self = (VALUE)user_data;
     VALUE ret;
-    ssize_t len;
 
     ret = rb_funcall(self, id_recv_event, 1, ULONG2NUM(length));
 
@@ -162,12 +176,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 	return NUM2INT(ret);
     }
 
-    Check_Type(ret, T_STRING);
-    len = RSTRING_LEN(ret);
-
-    memcpy(buf, StringValuePtr(ret), len);
-
-    return len;
+    return copy_to_buffer(ret, buf, length, "recv_event");
 }
 
 static int on_begin_frame_callback(nghttp2_session *session,
@@ -266,7 +275,6 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 {
     VALUE self = (VALUE)user_data;
     VALUE ret;
-    ssize_t len;
 
     ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
 	    ULONG2NUM(length));
@@ -289,11 +297,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
         }
     }
 
-    Check_Type(ret, T_STRING);
-    len = RSTRING_LEN(ret);
-    memcpy(buf, StringValuePtr(ret), len);
-
-    return len;
+    return copy_to_buffer(ret, buf, length, "on_data_source_read");
 }
 
 static void copy_list_to_nv(VALUE list, nghttp2_nv * head, size_t niv)
@@ -628,9 +632,7 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 	return 0;
     }
 
-    Check_Type(ret, T_STRING);
-    memcpy(buf, RSTRING_PTR(ret), RSTRING_LEN(ret));
-    return RSTRING_LEN(ret);
+    return copy_to_buffer(ret, buf, length, "request body's read");
 }
 
 static ssize_t
