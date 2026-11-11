@@ -451,7 +451,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     for(i = 0; i < niv; i++, head++) {
 	VALUE tuple = rb_ary_entry(settings, (long)i);
 	head->settings_id = NUM2INT(rb_ary_entry(tuple, 0));
-	head->value = NUM2INT(rb_ary_entry(tuple, 1));
+	head->value = NUM2UINT(rb_ary_entry(tuple, 1));
     }
 
     rv = nghttp2_submit_settings(session, NGHTTP2_FLAG_NONE, iv, niv);
