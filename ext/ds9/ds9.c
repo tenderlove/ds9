@@ -104,7 +104,7 @@ static int on_stream_close_callback(nghttp2_session *session,
 {
     VALUE self = (VALUE)user_data;
 
-    VALUE ret = rb_funcall(self, id_on_stream_close, 2, INT2NUM(stream_id), INT2NUM(error_code));
+    VALUE ret = rb_funcall(self, id_on_stream_close, 2, INT2NUM(stream_id), UINT2NUM(error_code));
 
     if (ret == Qfalse) {
 	return 1;

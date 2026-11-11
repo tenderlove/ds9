@@ -239,3 +239,71 @@ module DS9
     end
   end
 end
+
+module DS9
+  # A client and server talking through mem_send and mem_receive, with no
+  # threads or IO, so tests can step them in lockstep.
+  module InMemory
+    class Client < DS9::Client
+      attr_reader :responses
+
+      def initialize(...)
+        @responses = Hash.new { |h, k| h[k] = { headers: [], body: +"".b } }
+        super
+      end
+
+      def on_header name, value, frame, flags
+        @responses[frame.stream_id][:headers] << [name, value]
+      end
+
+      def on_data_chunk_recv stream_id, data, flags
+        @responses[stream_id][:body] << data
+      end
+
+      def request headers, body = nil
+        submit_request headers, body
+      end
+    end
+
+    class Server < DS9::Server
+      attr_reader :requests
+
+      def initialize(...)
+        @requests = Hash.new { |h, k| h[k] = { headers: [], body: +"".b } }
+        super
+      end
+
+      def on_header name, value, frame, flags
+        @requests[frame.stream_id][:headers] << [name, value]
+      end
+
+      def on_data_chunk_recv stream_id, data, flags
+        @requests[stream_id][:body] << data
+      end
+    end
+
+    REQUEST = [
+      [':method', 'GET'],
+      [':path', '/'],
+      [':scheme', 'http'],
+      [':authority', 'localhost'],
+    ].freeze
+
+    # Moves everything either side has to send to the other until neither
+    # has anything left.
+    def pump client, server
+      loop do
+        moved = false
+        while (data = client.mem_send)
+          server.mem_receive data
+          moved = true
+        end
+        while (data = server.mem_send)
+          client.mem_receive data
+          moved = true
+        end
+        break unless moved
+      end
+    end
+  end
+end
