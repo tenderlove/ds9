@@ -674,7 +674,12 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
 
     session = get_session(self);
 
-    rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
+    StringValue(buf);
+
+    /* nghttp2 reads straight from buf, so callbacks mustn't change it */
+    rb_str_locktmp(buf);
+    rv = nghttp2_session_mem_recv(session, (const uint8_t *)RSTRING_PTR(buf), RSTRING_LEN(buf));
+    rb_str_unlocktmp(buf);
     ds9_check_result(get_session_struct(self), rv);
     if (rv < 0) {
 	explode((int)rv);
