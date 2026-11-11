@@ -27,6 +27,6 @@ Gem::Specification.new do |s|
   s.add_runtime_dependency "mini_portile2", ">= 2.2.0"
 
   s.add_development_dependency "bundler"
-  s.add_development_dependency "minitest", "~> 5.7"
+  s.add_development_dependency "minitest", ">= 5.7"
   s.add_development_dependency "rake-compiler", ">= 1.0.5"
 end
