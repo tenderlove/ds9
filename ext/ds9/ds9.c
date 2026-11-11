@@ -41,6 +41,8 @@ typedef struct {
      * session to be used after one.
      */
     int fatal_error;
+    /* Whether the session has its own on_stream_close */
+    int has_on_stream_close;
 } ds9_session_t;
 
 static void ds9_session_mark(void *ptr)
@@ -237,7 +239,15 @@ static int on_stream_close_callback(nghttp2_session *session,
 				    uint32_t error_code,
 				    void *user_data)
 {
+    ds9_session_t *s = user_data;
     VALUE argv[] = { INT2NUM(stream_id), UINT2NUM(error_code) };
+
+    /* The stream may have closed before all of its body was sent */
+    if (RHASH_SIZE(s->bodies) > 0)
+	rb_hash_delete(s->bodies, argv[0]);
+
+    if (!s->has_on_stream_close) return 0;
+
     return ds9_callback(user_data, id_on_stream_close, 2, argv);
 }
 
@@ -1047,8 +1057,9 @@ static VALUE make_callbacks(VALUE self)
     if (rb_obj_respond_to(self, id_on_frame_recv, 1))
 	nghttp2_session_callbacks_set_on_frame_recv_callback(callbacks, on_frame_recv_callback);
 
-    if (rb_obj_respond_to(self, id_on_stream_close, 1))
-	nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
+    /* Always set, to let go of request bodies */
+    get_session_struct(self)->has_on_stream_close = rb_obj_respond_to(self, id_on_stream_close, 1);
+    nghttp2_session_callbacks_set_on_stream_close_callback(callbacks, on_stream_close_callback);
 
     if (rb_obj_respond_to(self, id_on_data_chunk_recv, 1))
 	nghttp2_session_callbacks_set_on_data_chunk_recv_callback(callbacks, on_data_chunk_recv_callback);
