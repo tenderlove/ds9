@@ -41,4 +41,6 @@ end
 abort 'nghttp2/nghttp2.h not found' unless have_header('nghttp2/nghttp2.h')
 abort 'libnghttp2 not found' unless have_library('nghttp2')
 
+have_func('rb_io_descriptor', 'ruby/io.h')
+
 create_makefile 'ds9'
