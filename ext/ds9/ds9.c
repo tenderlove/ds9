@@ -24,9 +24,59 @@ ID id_on_header,
    id_before_frame_send,
    id_eof_p;
 
-#define CheckSelf(ptr) \
-    if (NULL == (ptr)) \
-      rb_raise(eDS9UninitializedException, "not initialized, call `super` from `initialize`");
+/*
+ * nghttp2 hands this back to every callback as user_data. It, rather than
+ * the Ruby object, is what nghttp2 holds on to, so that GC compaction can
+ * move the object and update `self` here.
+ */
+typedef struct {
+    nghttp2_session *session;
+    VALUE self;
+    /* Request bodies being sent, by stream id */
+    VALUE bodies;
+} ds9_session_t;
+
+static void ds9_session_mark(void *ptr)
+{
+    ds9_session_t *s = ptr;
+    rb_gc_mark_movable(s->bodies);
+}
+
+static void ds9_session_free(void *ptr)
+{
+    ds9_session_t *s = ptr;
+    nghttp2_session_del(s->session);
+    xfree(s);
+}
+
+static void ds9_session_compact(void *ptr)
+{
+    ds9_session_t *s = ptr;
+    s->self = rb_gc_location(s->self);
+    s->bodies = rb_gc_location(s->bodies);
+}
+
+static const rb_data_type_t ds9_session_type = {
+    "DS9/session",
+    {ds9_session_mark, ds9_session_free, 0, ds9_session_compact,},
+    0, 0,
+    RUBY_TYPED_FREE_IMMEDIATELY,
+};
+
+static ds9_session_t *get_session_struct(VALUE self)
+{
+    ds9_session_t *s;
+    TypedData_Get_Struct(self, ds9_session_t, &ds9_session_type, s);
+    return s;
+}
+
+static nghttp2_session *get_session(VALUE self)
+{
+    ds9_session_t *s = get_session_struct(self);
+    if (NULL == s->session)
+	rb_raise(eDS9UninitializedException, "not initialized, call `super` from `initialize`");
+    return s->session;
+}
 
 static void * wrap_xmalloc(size_t size, void *mem_user_data)
 {
@@ -56,7 +106,7 @@ static int before_frame_send_callback(nghttp2_session *session,
 				      const nghttp2_frame *frame,
 				      void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_before_frame_send, 1, WrapDS9Frame(frame));
@@ -71,7 +121,7 @@ static ssize_t send_callback(nghttp2_session * session,
 			     size_t length,
 			     int flags, void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_send_event, 1, rb_str_new((const char *)data, length));
@@ -83,7 +133,7 @@ static int on_frame_recv_callback(nghttp2_session *session,
 				  const nghttp2_frame *frame,
 				  void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_frame_recv, 1, WrapDS9Frame(frame));
@@ -100,7 +150,7 @@ static int on_stream_close_callback(nghttp2_session *session,
 				    uint32_t error_code,
 				    void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
 
     VALUE ret = rb_funcall(self, id_on_stream_close, 2, INT2NUM(stream_id), UINT2NUM(error_code));
 
@@ -117,7 +167,7 @@ static int on_header_callback(nghttp2_session *session,
 			      const uint8_t *value, size_t valuelen,
 			      uint8_t flags, void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
 
     VALUE ret = rb_funcall(self, id_on_header, 4,
 	    rb_usascii_str_new((const char *)name, namelen),
@@ -136,7 +186,7 @@ static int on_begin_headers_callback(nghttp2_session *session,
 			             const nghttp2_frame *frame,
 			             void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
 
     VALUE ret = rb_funcall(self, id_on_begin_headers, 1,
 	    WrapDS9Frame(frame));
@@ -167,7 +217,7 @@ static ssize_t recv_callback(nghttp2_session *session, uint8_t *buf,
 			     size_t length, int flags,
 			     void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_recv_event, 1, ULONG2NUM(length));
@@ -183,7 +233,7 @@ static int on_begin_frame_callback(nghttp2_session *session,
 				   const nghttp2_frame_hd *hd,
 				   void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_begin_frame, 1, WrapDS9FrameHeader(hd));
@@ -201,7 +251,7 @@ static int on_data_chunk_recv_callback(nghttp2_session *session,
 				       const uint8_t *data,
 				       size_t len, void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_data_chunk_recv, 3,
@@ -220,7 +270,7 @@ static int on_invalid_frame_recv_callback(nghttp2_session *session,
 					  const nghttp2_frame *frame, int lib_error_code,
 					  void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_invalid_frame_recv, 2,
@@ -238,7 +288,7 @@ static int on_frame_send_callback(nghttp2_session *session,
 				  const nghttp2_frame *frame,
 				  void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_frame_send, 1, WrapDS9Frame(frame));
@@ -255,7 +305,7 @@ static int on_frame_not_send_callback(nghttp2_session *session,
 				      int lib_error_code,
 				      void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE reason = rb_str_new2(nghttp2_strerror(lib_error_code));
     VALUE ret;
 
@@ -273,7 +323,7 @@ static ssize_t rb_data_read_callback(nghttp2_session *session,
 				     size_t length, uint32_t *data_flags,
 				     nghttp2_data_source *source, void *user_data)
 {
-    VALUE self = (VALUE)user_data;
+    VALUE self = ((ds9_session_t *)user_data)->self;
     VALUE ret;
 
     ret = rb_funcall(self, id_on_data_source_read, 2, INT2NUM(stream_id),
@@ -379,7 +429,11 @@ static void headers_to_nv(VALUE headers, nghttp2_nv *nva, size_t niv)
 
 static VALUE allocate_session(VALUE klass)
 {
-    return TypedData_Wrap_Struct(klass, &ds9_session_type, 0);
+    ds9_session_t *s;
+    VALUE obj = TypedData_Make_Struct(klass, ds9_session_t, &ds9_session_type, s);
+    s->self = obj;
+    s->bodies = rb_hash_new();
+    return obj;
 }
 
 static VALUE client_init_internals(VALUE self, VALUE cb, VALUE opt)
@@ -397,8 +451,8 @@ static VALUE client_init_internals(VALUE self, VALUE cb, VALUE opt)
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
     option = UnwrapDS9Option(opt);
-    nghttp2_session_client_new3(&session, callbacks, (void *)self, option, &mem);
-    DATA_PTR(self) = session;
+    nghttp2_session_client_new3(&session, callbacks, get_session_struct(self), option, &mem);
+    get_session_struct(self)->session = session;
 
     return self;
 }
@@ -418,8 +472,8 @@ static VALUE server_init_internals(VALUE self, VALUE cb, VALUE opt)
 
     TypedData_Get_Struct(cb, nghttp2_session_callbacks, &ds9_callbacks_type, callbacks);
     option = UnwrapDS9Option(opt);
-    nghttp2_session_server_new3(&session, callbacks, (void *)self, option, &mem);
-    DATA_PTR(self) = session;
+    nghttp2_session_server_new3(&session, callbacks, get_session_struct(self), option, &mem);
+    get_session_struct(self)->session = session;
 
     return self;
 }
@@ -428,8 +482,7 @@ static VALUE session_want_write_p(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     if (nghttp2_session_want_write(session) == 0) {
 	return Qfalse;
@@ -442,8 +495,7 @@ static VALUE session_want_read_p(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     if (nghttp2_session_want_read(session) == 0) {
 	return Qfalse;
@@ -456,8 +508,7 @@ static VALUE session_submit_ping(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     if (nghttp2_submit_ping(session, NGHTTP2_FLAG_NONE, NULL) == 0)
 	return Qtrue;
@@ -473,8 +524,7 @@ static VALUE session_submit_settings(VALUE self, VALUE settings)
     nghttp2_session *session;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     Check_Type(settings, T_ARRAY);
     niv = RARRAY_LEN(settings);
@@ -507,8 +557,7 @@ static VALUE session_submit_trailer(VALUE self, VALUE stream_id, VALUE trailers)
     int32_t s_id;
     VALUE nva_buf;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     s_id = NUM2INT(stream_id);
 
@@ -532,8 +581,7 @@ static VALUE session_send(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_session_send(session);
     if (rv != 0) {
@@ -548,8 +596,7 @@ static VALUE session_receive(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     assert(session);
     rv = nghttp2_session_recv(session);
@@ -565,8 +612,7 @@ static VALUE session_mem_receive(VALUE self, VALUE buf)
     ssize_t rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_session_mem_recv(session, (const uint8_t *)StringValuePtr(buf), RSTRING_LEN(buf));
     if (rv < 0) {
@@ -582,8 +628,7 @@ static VALUE session_mem_send(VALUE self)
     const uint8_t *data;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_session_mem_send(session, &data);
 
@@ -602,8 +647,7 @@ static VALUE session_outbound_queue_size(VALUE self)
 {
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     return ULONG2NUM(nghttp2_session_get_outbound_queue_size(session));
 }
@@ -612,7 +656,8 @@ static ssize_t
 ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t length,
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
-    VALUE body = (VALUE)source->ptr;
+    ds9_session_t *s = user_data;
+    VALUE body = rb_hash_aref(s->bodies, INT2NUM(stream_id));
     VALUE ret = rb_funcall(body, rb_intern("read"), 1, ULONG2NUM(length));
 
     if (FIXNUM_P(ret)) {
@@ -623,8 +668,7 @@ ruby_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     }
 
     if (NIL_P(ret) || (rb_respond_to(body, id_eof_p) && RTEST(rb_funcall(body, id_eof_p, 0)))) {
-	VALUE self = (VALUE)user_data;
-	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
+	rb_hash_delete(s->bodies, INT2NUM(stream_id));
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
     }
 
@@ -640,7 +684,8 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
     uint32_t *data_flags, nghttp2_data_source *source, void *user_data)
 {
     ssize_t nread;
-    VALUE io = (VALUE)source->ptr;
+    ds9_session_t *s = user_data;
+    VALUE io = rb_hash_aref(s->bodies, INT2NUM(stream_id));
     int fd;
 #ifdef HAVE_RB_IO_DESCRIPTOR
     fd = rb_io_descriptor(io);
@@ -659,8 +704,7 @@ file_read(nghttp2_session *session, int32_t stream_id, uint8_t *buf, size_t leng
 
     if (nread == 0) {
 	*data_flags |= NGHTTP2_DATA_FLAG_EOF;
-	VALUE self = (VALUE)user_data;
-	rb_funcall(self, rb_intern("remove_post_buffer"), 1, INT2NUM(stream_id));
+	rb_hash_delete(s->bodies, INT2NUM(stream_id));
     }
     return nread;
 }
@@ -674,8 +718,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     int rv;
     VALUE nva_buf;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     niv = headers_count(settings);
     nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
@@ -684,12 +727,12 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     if (NIL_P(body)) {
 	rv = nghttp2_submit_request(session, NULL, nva, niv, NULL, NULL);
     } else {
+	/* The callbacks find the body in the session's bodies by stream id */
+	provider.source.ptr = NULL;
 	if (TYPE(body) == T_FILE) {
 	    /* Treat as a file descriptor */
-	    provider.source.ptr = (void *)body;
 	    provider.read_callback = file_read;
 	} else {
-	    provider.source.ptr = (void *)body;
 	    provider.read_callback = ruby_read;
 	}
 
@@ -703,7 +746,7 @@ static VALUE session_submit_request(VALUE self, VALUE settings, VALUE body)
     }
 
     if(!NIL_P(body)) {
-	rb_funcall(self, rb_intern("save_post_buffer"), 2, INT2NUM(rv), body);
+	rb_hash_aset(get_session_struct(self)->bodies, INT2NUM(rv), body);
     }
 
     return INT2NUM(rv);
@@ -714,8 +757,7 @@ static VALUE session_submit_shutdown(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_submit_shutdown_notice(session);
 
@@ -730,8 +772,7 @@ static VALUE session_get_last_proc_stream_id(VALUE self)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_session_get_last_proc_stream_id(session);
 
@@ -743,8 +784,7 @@ static VALUE session_submit_goaway(VALUE self, VALUE last_stream_id, VALUE err)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_submit_goaway(session, NGHTTP2_FLAG_NONE,
 	    NUM2INT(last_stream_id), NUM2INT(err), NULL, 0);
@@ -760,8 +800,7 @@ static VALUE session_stream_local_closed_p(VALUE self, VALUE streamid)
     nghttp2_session *session;
     int stream_id;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     stream_id = NUM2INT(streamid);
 
@@ -785,8 +824,7 @@ static VALUE session_stream_remote_closed_p(VALUE self, VALUE streamid)
     nghttp2_session *session;
     int stream_id;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     stream_id = NUM2INT(streamid);
 
@@ -811,8 +849,7 @@ static VALUE session_resume_data(VALUE self, VALUE streamid)
     int stream_id;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     stream_id = NUM2INT(streamid);
     rv = nghttp2_session_resume_data(session, stream_id);
@@ -828,8 +865,7 @@ static VALUE session_terminate_session(VALUE self, VALUE err)
     int rv;
     nghttp2_session *session;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     rv = nghttp2_session_terminate_session(session, NUM2INT(err));
 
@@ -849,8 +885,7 @@ static VALUE server_submit_response(VALUE self, VALUE stream_id, VALUE headers)
     int rv;
     VALUE nva_buf;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     niv = headers_count(headers);
     nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
@@ -876,8 +911,7 @@ static VALUE server_submit_headers(VALUE self, VALUE stream_id, VALUE headers) {
     int rv;
     VALUE nva_buf;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     niv = headers_count(headers);
     nva = ALLOCV_N(nghttp2_nv, nva_buf, niv);
@@ -947,8 +981,7 @@ static VALUE server_submit_push_promise(VALUE self, VALUE stream_id, VALUE heade
     size_t niv;
     int rv;
 
-    TypedData_Get_Struct(self, nghttp2_session, &ds9_session_type, session);
-    CheckSelf(session);
+    session = get_session(self);
 
     Check_Type(headers, T_ARRAY);
     niv = headers_count(headers);
