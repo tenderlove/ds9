@@ -43,3 +43,11 @@ class TestDS9 < Minitest::Test
     refute_predicate session, :want_write?
   end
 end
+
+class TestSettings < Minitest::Test
+  def test_setting_over_int_max
+    session = DS9::Server.new
+    session.submit_settings [[DS9::Settings::MAX_HEADER_LIST_SIZE, 2**32 - 1]]
+    assert_predicate session, :want_write?
+  end
+end

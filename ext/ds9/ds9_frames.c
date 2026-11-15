@@ -121,7 +121,7 @@ static VALUE goaway_error_code(VALUE self)
     nghttp2_frame *frame;
     TypedData_Get_Struct(self, nghttp2_frame, &ds9_frame_type, frame);
 
-    return INT2NUM(frame->goaway.error_code);
+    return UINT2NUM(frame->goaway.error_code);
 }
 
 void Init_ds9_frames(VALUE mDS9)
